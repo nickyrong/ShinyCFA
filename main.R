@@ -23,6 +23,8 @@ ui <- fluidPage(
 
       tabsetPanel(
                   
+                  tabPanel("Station Info", "Station information & map??"),
+                  
                   tabPanel("Data Table", DT::dataTableOutput("table")),
         
                   tabPanel("Screening Summary", 
@@ -34,6 +36,16 @@ ui <- fluidPage(
                            plotOutput(outputId = "ts", height = "600px")),
                   
                   tabPanel("Annual Hyrograph", 
+                           
+                           # Select whether to overlay smooth trend line
+                           checkboxInput(inputId = "smoother", label = strong("Moving Averages?"), value = FALSE),
+                           
+                           # Display only if the smoother is checked
+                           conditionalPanel(condition = "input.smoother == true",
+                                            sliderInput(inputId = "ma.window", label = "Smoother span:",
+                                                        min = 2, max = 30, value = 7),
+                                            HTML("Smoothing by days")),
+                           
                            plotOutput(outputId = "regime", height = "600px")),
                   
                   tabPanel("Flow Duration", 
@@ -52,16 +64,45 @@ server <- function(input, output) {
   library(tidyhydat)
   library(FlowScreen)
   
-  source("~/Documents/GitHub/ShinyCFA/read.wsc.flows.R")
+  #source("~/Documents/GitHub/ShinyCFA/read.wsc.flows.R")
+  # A script to bridge the tidyhat and flowscreen
+  # the "read.flows" function of FlowScreen{} is intended for CSV files only
+  
+  #library(tidyhydat)
+  
+  read.wsc.flows <- function (station_number) {
+    
+    # read Qdaily from HYDAT
+    dailyflow_tibble = tidyhydat::hy_daily_flows(station_number = station_number)
+    
+    # put the Qdaily into format readable by FlowScreen{}
+    wsc_input_df = data.frame(
+      ID = rep(station_number, length.out = dim(dailyflow_tibble)[1]),
+      # Flow parameter: 1 = Flow, 2 = level
+      PARAM = rep(1, length.out = dim(dailyflow_tibble)[1]),
+      Date = dailyflow_tibble$Date,
+      Flow = dailyflow_tibble$Value,
+      SYM = dailyflow_tibble$Symbol,
+      Agency = rep("WSC", length.out = dim(dailyflow_tibble)[1])
+    )
+    
+    return(wsc_input_df)
+  }
+  
+  #### EOF
   
   
   # Date Range Warning
   selected_window <- reactive({
     req(input$date)
     req(input$stn.id)
+    req(input$smoother)
+    req(input$ma.window)
+    
     validate(need(!is.na(input$date[1]) & !is.na(input$date[2]), "Error: Please provide both a start and an end date."))
     validate(need(input$date[1] < input$date[2], "Error: Start date should be earlier than end date."))
-    validate(need(!is.na(input$stn.id), "Error: Start date should be earlier than end date."))
+    validate(need(!is.na(input$stn.id), "Can't read mind! Gotta tell me a station ID."))
+    validate(need(!is.na(input$ma.window), "Error: something went horribly wrong"))
   })
   
   # Return Station ID
@@ -111,14 +152,28 @@ server <- function(input, output) {
   # Hydrograph
   output$regime <- renderPlot({
     
-    FlowScreen::create.ts(read.wsc.flows(toupper(input$stn.id))) %>%
+    TS_subset <- read.wsc.flows(toupper(input$stn.id)) %>%
       subset(
         Date > base::as.Date(paste0(input$date[1], "-01-01")) &
           Date < base::as.Date(paste0(input$date[2], "-12-31"))
-      ) %>%
-      FlowScreen::regime(text = NULL)
+      ) %>% FlowScreen::create.ts()
     
-
+      FlowScreen::regime(TS_subset)
+      
+    # Display only if smoother is checked
+    if(input$smoother){
+      
+      TS_subset <- read.wsc.flows(toupper(input$stn.id)) %>%
+        subset(
+          Date > base::as.Date(paste0(input$date[1], "-01-01")) &
+            Date < base::as.Date(paste0(input$date[2], "-12-31"))
+        ) %>% FlowScreen::create.ts()
+      
+      TS_ma <- TS_subset
+      TS_ma$Flow <- rollmean(x = TS_subset$Flow, k = as.integer(input$ma.window), 
+                              fill = list(NA, "extend"))
+      FlowScreen::regime(TS_ma)
+    }
   })
   
   # FDC
@@ -137,11 +192,14 @@ server <- function(input, output) {
   # Data table
   output$table <- DT::renderDataTable({
     DT::datatable({
-      read.wsc.flows(toupper(input$stn.id)) %>%
+      TS_subset <- read.wsc.flows(toupper(input$stn.id)) %>%
         subset(
           Date > base::as.Date(paste0(input$date[1], "-01-01")) &
             Date < base::as.Date(paste0(input$date[2], "-12-31"))
-        ) %>% FlowScreen::create.ts()
+        )
+      TS_round <- TS_subset
+      TS_round$Flow <- round(TS_subset$Flow, digits = 0) 
+      FlowScreen::create.ts(TS_round)
     })
 
   })
