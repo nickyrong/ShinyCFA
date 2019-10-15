@@ -9,6 +9,7 @@ ui <- fluidPage(
     headerPanel('HYDAT Data Access Portal'),
     
     sidebarPanel(
+      width = 2,
       
       textInput("stn.id", label = h3("WSC Station ID"), value = "08GA010"),
       # Select date range to be plotted
@@ -30,7 +31,7 @@ ui <- fluidPage(
                   tabPanel("Screening Summary", 
                            print("This function might take quite some time (30s) to plot"),
                            br(),
-                           plotOutput(outputId = "screening", height = "600px")),
+                           plotOutput(outputId = "screening", height = "800px")),
         
                   tabPanel("Time Series", 
                            plotOutput(outputId = "ts", height = "600px")),
