@@ -5,34 +5,49 @@ library(leaflet)
 library(dplyr)
 library(lubridate)
 library(readr)
+library(xts)
+library(dygraphs)
+library(tidyr)
 
-# Generate the data for the map by calling coordinates and labels from the HYDAT database
-#station_info <- tidyhydat::allstations %>%
-#    filter(PROV_TERR_STATE_LOC == "BC") %>%
-#    select(number = STATION_NUMBER, lat = LATITUDE, lng = LONGITUDE, name = STATION_NAME, status = HYD_STATUS) %>%
-#    mutate(text = paste(sep = "<br/>", paste("<b>", number, "</b>"), name, status))
+# Generate the data for the map by calling coordinates, labels, and date ranges from the HYDAT database
+range.df <-  hy_stn_data_range() %>% 
+    
+    # Grab Flow record range (Q)
+    filter(DATA_TYPE == "Q") %>%
+    select(STATION_NUMBER, Qfrom = Year_from, Qto = Year_to, Qn = RECORD_LENGTH) %>%
+    
+    # Grab Stage record range (H) and append to the df
+    left_join(
+        hy_stn_data_range() %>%
+            filter(DATA_TYPE == "H") %>%
+            select(STATION_NUMBER, Hfrom = Year_from, Hto = Year_to, Hn = RECORD_LENGTH),
+        by = "STATION_NUMBER"
+    ) # end of left_join()
 
-# A function to wrange the tidyhydat table into FlowScreen compatible format
+map_data <- tidyhydat::allstations %>%
+    left_join(range.df, by = "STATION_NUMBER") %>%
+    mutate(text = paste(sep = "<br/>", paste("<b>", STATION_NUMBER, "</b>"), 
+                        STATION_NAME, 
+                        HYD_STATUS,
+                        paste0("Flow Record: from ", Qfrom, " to ", Qto, " (", Qn, " Yrs)"),
+                        paste0("Stage Record: from ", Hfrom, " to ", Hto, " (", Hn, " Yrs)")
+    ))
+
+# A function to wrangle the tidyhydat table into FlowScreen compatible format
 read.wsc.flows <- function (station_number) {
     
     # read Qdaily from HYDAT
-    dailyflow_tibble = tidyhydat::hy_daily_flows(station_number = station_number)
+    Q_Daily = tidyhydat::hy_daily_flows(station_number = station_number)
     
-    # put the Qdaily into format readable by FlowScreen{}
-    wsc_input_df = data.frame(
-        ID = rep(station_number, length.out = dim(dailyflow_tibble)[1]),
+    # put the Qdaily into format readable by FlowScreen Package
+    wsc_input_df <- Q_Daily %>% 
         # Flow parameter: 1 = Flow, 2 = level
-        PARAM = rep(1, length.out = dim(dailyflow_tibble)[1]),
-        Date = dailyflow_tibble$Date,
-        Flow = dailyflow_tibble$Value,
-        SYM = dailyflow_tibble$Symbol,
-        Agency = rep("WSC", length.out = dim(dailyflow_tibble)[1])
-    )
+        mutate(ID = station_number, PARAM = 1, Agency = "WSC") %>% 
+        select(ID, PARAM, Date, Flow = Value, SYM = Symbol, Agency)
     
     return(wsc_input_df)
 } # EOF read.wsc.flows()
 
-#### EOF
 # Create flag names and plotting colours for data symbols
 SYMs <- c("", "E", "A", "B", "D", "R")
 SYMnames <- c("No Code", "Estimate", "Partial Day", "Ice Conditions", "Dry", "Revised")
@@ -62,39 +77,16 @@ shinyServer(function(input, output) {
             select(STATION_NAME)
         printname[[1]]
     })
+    
+    # Station Dataset
+    Dataset <- reactive({
+        Q_Daily = tidyhydat::hy_daily_flows(station_number = id.check())
+        Q_Daily
+    })
 
     # Map
     output$MapPlot <- renderLeaflet({
-
-        grab_range <- function() {
-            
-            range.df <-  hy_stn_data_range() %>% 
-                
-                # Grab Flow record range (Q)
-                filter(DATA_TYPE == "Q") %>%
-                select(STATION_NUMBER, Qfrom = Year_from, Qto = Year_to, Qn = RECORD_LENGTH) %>%
-                
-                # Grab Stage record range (H) and append to the df
-                left_join(
-                    hy_stn_data_range() %>%
-                        filter(DATA_TYPE == "H") %>%
-                        select(STATION_NUMBER, Hfrom = Year_from, Hto = Year_to, Hn = RECORD_LENGTH),
-                    by = "STATION_NUMBER"
-                ) # end of left_join()
-            # end of range.df piping
-            
-        return(range.df)
-        } #end of grab_range()
-        
-        tidyhydat::allstations %>%
-            left_join(grab_range(), by = "STATION_NUMBER") %>%
-            mutate(text = paste(sep = "<br/>", paste("<b>", STATION_NUMBER, "</b>"), 
-                                STATION_NAME, 
-                                HYD_STATUS,
-                                paste0("Flow Record: from ", Qfrom, " to ", Qto, " (", Qn, " Yrs)"),
-                                paste0("Stage Record: from ", Hfrom, " to ", Hto, " (", Hn, " Yrs)")
-                                )
-                   ) %>%
+        map_data %>% 
             leaflet() %>%
             addTiles() %>%
             addMarkers(~LONGITUDE, ~LATITUDE, popup = ~text, clusterOptions = markerClusterOptions())
@@ -127,8 +119,9 @@ shinyServer(function(input, output) {
             }
             else if(input$Reso == "Yearly"){
                 TS <- TS %>% group_by(Year) %>%
-                    summarise(Average_Flow = mean(Flow, na.rm = TRUE), Count = sum(is.na(Flow)==FALSE))
-                TS$Average_Flow <- round(TS$Average_Flow, digits = 0)
+                    summarise(Average_Flow = mean(Flow, na.rm = TRUE), Max_Daily = max(Flow, na.rm = TRUE),
+                              Min_Daily = min(Flow, na.rm = TRUE), Count = sum(is.na(Flow)==FALSE))
+                TS <- round(select(TS, -Year), digits = 0)
                 TS
             }
         })
@@ -153,5 +146,43 @@ shinyServer(function(input, output) {
                          bty="n", xjust=0, x.intersp=0.5, yjust=0.5, ncol=3)
 
     })
+    
+    ### Plot an interactive graph
+#    output$test <- renderDygraph({
+#    
+#        # Spread the flow data by the flag
+#        TS = read.wsc.flows(station_number = id.check()) %>%
+#            select(Date, Flow, Symbol = SYM)
+#        
+#        plot_data <- spread(TS, Symbol, Flow)
+#        number_flags <- length(unique(TS$Symbol))
+#        flag_names <- colnames(plot_data)[-1]
+#        
+#        # Convert to an xts format required by the dygraphs package
+#        xts_Date <- as.POSIXct(plot_data$Date, format = "%Y-%m-%d")
+#        xts_Format <- as.xts(order.by = xts_Date, x = plot_data[,2])
+#        
+#        # Combine flag columns, :(number_flags - 1)
+#        if(!number_flags == 1) {
+#            for (i in 1:1) {
+#                index <- 2 + i
+#                xts_Format <- cbind(xts_Format, plot_data[,index])
+#            }
+#        }
+#        colnames(xts_Format) <- paste0("Flag_", flag_names)
+#        Title <- "Hydrograph Plot"
+#        y_axis <- "Flow (m3/s)"
+#        dygraph(xts_Format, main = Title, ylab = y_axis) %>% dyRangeSelector()
+#    })
+    
+    # Download Data
+    output$downloadData <- downloadHandler(
+        filename = function() {
+            paste(id.check(), ".csv", sep = "")
+        },
+        content = function(file) {
+            write.csv(Dataset(), file, row.names = FALSE)
+        }
+    )
 
 })

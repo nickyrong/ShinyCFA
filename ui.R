@@ -1,6 +1,8 @@
 rm(list=ls())
 library(shiny)
 library(leaflet)
+library(dygraphs)
+
 
 # Define UI for application that draws a histogram
 shinyUI(fluidPage(
@@ -12,6 +14,7 @@ shinyUI(fluidPage(
             print("Enter a valid WSC Station ID"),
             br(), br(),
             textInput("stn.id", label = h3("WSC Station ID"), value = "08GA010"),
+            downloadButton("downloadData", "Download Station Data"),
             br(),
             h3(textOutput("status"))
         ),
@@ -56,7 +59,11 @@ shinyUI(fluidPage(
                 tabPanel("Time Series",
                          br(),
                          plotOutput(outputId = "ts", height = "600px")
-                         )
+                
+#                tabPanel("Test Tab",
+#                         br(),
+#                         plotOutput(outputId = "test", height = "600px")
+                )
             )
         )
     )
