@@ -135,52 +135,59 @@ shinyServer(function(input, output) {
     })
 
     # Time Series Plot
-    output$ts <- renderPlot({
-
-        TS = read.wsc.flows(station_number = id.check()) %>%
-            select(Date, Flow, Symbol = SYM)
-
-        codes <- as.factor(TS$Symbol)
-        codes <- match(codes, SYMs)
-
-        graphics::par(mar=c(4,4,0,0.5))
-        mYlims <- c(0, 1.2*max(TS$Flow, na.rm = TRUE))
-        graphics::plot(TS$Date, TS$Flow, typ = "l", col = "grey",
-                       xlab="Date", ylab="Flow (m^3/s)", ylim=mYlims)
-        graphics::points(TS$Date, TS$Flow,
-                         pch=19, col=SYMcol[codes], cex=0.5)
-        graphics::legend(TS$Date[1], 1.15*max(TS$Flow, na.rm = TRUE), SYMnames, pch=19, pt.cex=0.9, cex=0.9, col=SYMcol,
-                         bty="n", xjust=0, x.intersp=0.5, yjust=0.5, ncol=3)
-
-    })
-    
-    ### Plot an interactive graph
-#    output$test <- renderDygraph({
-#    
-#        # Spread the flow data by the flag
+#    output$ts <- renderPlot({
+#
 #        TS = read.wsc.flows(station_number = id.check()) %>%
 #            select(Date, Flow, Symbol = SYM)
-#        
-#        plot_data <- spread(TS, Symbol, Flow)
-#        number_flags <- length(unique(TS$Symbol))
-#        flag_names <- colnames(plot_data)[-1]
-#        
-#        # Convert to an xts format required by the dygraphs package
-#        xts_Date <- as.POSIXct(plot_data$Date, format = "%Y-%m-%d")
-#        xts_Format <- as.xts(order.by = xts_Date, x = plot_data[,2])
-#        
-#        # Combine flag columns, :(number_flags - 1)
-#        if(!number_flags == 1) {
-#            for (i in 1:1) {
-#                index <- 2 + i
-#                xts_Format <- cbind(xts_Format, plot_data[,index])
-#            }
-#        }
-#        colnames(xts_Format) <- paste0("Flag_", flag_names)
-#        Title <- "Hydrograph Plot"
-#        y_axis <- "Flow (m3/s)"
-#        dygraph(xts_Format, main = Title, ylab = y_axis) %>% dyRangeSelector()
+#
+#       codes <- as.factor(TS$Symbol)
+#        codes <- match(codes, SYMs)
+#
+#        graphics::par(mar=c(4,4,0,0.5))
+#        mYlims <- c(0, 1.2*max(TS$Flow, na.rm = TRUE))
+#        graphics::plot(TS$Date, TS$Flow, typ = "l", col = "grey",
+#                       xlab="Date", ylab="Flow (m^3/s)", ylim=mYlims)
+#        graphics::points(TS$Date, TS$Flow,
+#                         pch=19, col=SYMcol[codes], cex=0.5)
+#        graphics::legend(TS$Date[1], 1.15*max(TS$Flow, na.rm = TRUE), SYMnames, pch=19, pt.cex=0.9, cex=0.9, col=SYMcol,
+#                         bty="n", xjust=0, x.intersp=0.5, yjust=0.5, ncol=3)
+#
 #    })
+    
+    ### Plot an interactive graph
+    output$graph <- renderDygraph({
+    
+        # Spread the flow data by the flag
+        TS = read.wsc.flows(station_number = id.check()) %>%
+            select(Date, Flow, Symbol = SYM)
+        codes <- as.factor(TS$Symbol)
+        codes <- match(codes, SYMs)
+        TS$Symbol <- SYMnames[codes]
+        plot_data <- spread(TS, Symbol, Flow)
+        number_flags <- length(unique(TS$Symbol))
+        flag_names <- colnames(plot_data)[-1]
+        flag_names <- replace(flag_names, flag_names == "<NA>", "No Flag")
+        
+        # Convert to an xts format required by the dygraphs package
+        xts_Date <- as.POSIXct(plot_data$Date, format = "%Y-%m-%d")
+        xts_Format <- as.xts(order.by = xts_Date, x = plot_data[,2])
+        
+        # Combine flag columns, :(number_flags - 1)
+        if(!number_flags == 1) {
+            for (i in 1:(number_flags - 1)) {
+                index <- 2 + i
+                temp <- as.xts(order.by = xts_Date, x = plot_data[,index])
+                xts_Format <- cbind(xts_Format, temp[,1])
+                rm(temp)
+            }
+        }
+        colnames(xts_Format) <- flag_names
+        y_axis <- "Flow (m3/s)"
+        dygraph(xts_Format, ylab = y_axis) %>%
+            dyLegend(width = 600) %>%
+            dyRangeSelector()
+        #show = "always", hideOnMouseOut = TRUE
+    })
     
     # Download Data
     output$downloadData <- downloadHandler(
