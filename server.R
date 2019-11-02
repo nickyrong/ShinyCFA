@@ -9,8 +9,15 @@ library(xts)
 library(dygraphs)
 library(tidyr)
 
+# Determine Hydat database location
+if(file.exists ("./Database/Hydat.sqlite3")){
+    Hydat_Location <- ".\\Database/Hydat.sqlite3"
+} else {
+    Hydat_Location <- tidyhydat::hy_default_db()
+    }
+
 # Generate the data for the map by calling coordinates, labels, and date ranges from the HYDAT database
-range.df <-  hy_stn_data_range() %>% 
+range.df <-  tidyhydat::hy_stn_data_range(hydat_path = Hydat_Location) %>% 
     
     # Grab Flow record range (Q)
     filter(DATA_TYPE == "Q") %>%
@@ -18,7 +25,7 @@ range.df <-  hy_stn_data_range() %>%
     
     # Grab Stage record range (H) and append to the df
     left_join(
-        hy_stn_data_range() %>%
+        tidyhydat::hy_stn_data_range(hydat_path = Hydat_Location) %>%
             filter(DATA_TYPE == "H") %>%
             select(STATION_NUMBER, Hfrom = Year_from, Hto = Year_to, Hn = RECORD_LENGTH),
         by = "STATION_NUMBER"
@@ -34,10 +41,10 @@ map_data <- tidyhydat::allstations %>%
     ))
 
 # A function to wrangle the tidyhydat table into FlowScreen compatible format
-read.wsc.flows <- function (station_number) {
+read.wsc.flows <- function(station_number) {
     
     # read Qdaily from HYDAT
-    Q_Daily = tidyhydat::hy_daily_flows(station_number = station_number)
+    Q_Daily = tidyhydat::hy_daily_flows(station_number = station_number, hydat_path = Hydat_Location)
     
     # put the Qdaily into format readable by FlowScreen Package
     wsc_input_df <- Q_Daily %>% 
@@ -80,7 +87,7 @@ shinyServer(function(input, output) {
     
     # Station Dataset
     Dataset <- reactive({
-        Q_Daily = tidyhydat::hy_daily_flows(station_number = id.check())
+        Q_Daily = tidyhydat::hy_daily_flows(station_number = id.check(), hydat_path = Hydat_Location)
         Q_Daily
     })
 
