@@ -54,15 +54,19 @@ shinyUI(fluidPage(
                          print("Select Daily, Monthly, or Yearly Resolution"),
                          selectInput("Reso", "", c("Daily" = "Daily", "Monthly" = "Monthly", "Yearly" = "Yearly"),
                                      selected = "Daily"), p(""),
-                         DT::dataTableOutput("table")),
+                         DT::dataTableOutput("table")
+                         ),
 
+#                tabPanel("Time Series",
+#                         br(),
+#                         plotOutput(outputId = "ts", height = "600px")
+#                         ),
+                
                 tabPanel("Time Series",
                          br(),
-                         plotOutput(outputId = "ts", height = "600px")
-                
-#                tabPanel("Test Tab",
-#                         br(),
-#                         plotOutput(outputId = "test", height = "600px")
+                         dygraphOutput(outputId = "graph", height = "600px"),
+                         br(),
+                         print("This is an interactive graph: drag to zoom in and double click to zoom out")
                 )
             )
         )
