@@ -7,7 +7,11 @@ library(lubridate)
 library(readr)
 library(xts)
 library(dygraphs)
-library(tidyr)
+library(tidyverse)
+library(lmom)
+
+
+# ------------ HYDAT database loading ------------
 
 # Determine Hydat database location
 if(file.exists("./database/Hydat.sqlite3")) {
@@ -15,6 +19,9 @@ if(file.exists("./database/Hydat.sqlite3")) {
 } else {
     Hydat_Location <- tidyhydat::hy_default_db()
     }
+
+
+# ------------ Station Map Plotting ------------
 
 # Generate the data for the map by calling coordinates, labels, and date ranges from the HYDAT database
 range.df <-  tidyhydat::hy_stn_data_range(hydat_path = Hydat_Location) %>% 
@@ -40,6 +47,9 @@ map_data <- tidyhydat::allstations %>%
                         paste0("Stage Record: from ", Hfrom, " to ", Hto, " (", Hn, " Yrs)")
     ))
 
+
+
+# ------------ HYDAT data processing ------------
 # A function to wrangle the tidyhydat table into FlowScreen compatible format
 read.wsc.flows <- function(station_number) {
     
@@ -60,6 +70,11 @@ SYMs <- c("", "E", "A", "B", "D", "R")
 SYMnames <- c("No Code", "Estimate", "Partial Day", "Ice Conditions", "Dry", "Revised")
 SYMcol <- c("grey", "#E41A1C", "#4DAF4A", "#377EB8", "#FF7F00", "#984EA3")
 
+
+
+# ------------ Shiny Server In/Output ------------
+
+
 # Define server logic
 shinyServer(function(input, output) {
     
@@ -70,6 +85,7 @@ shinyServer(function(input, output) {
             } else {""}
     })
 
+    
     # Reactive statement to allow functions to run only if station is valid
     id.check <- reactive({
         # Make sure station is valid & output CAPITALIZED ID (always go through ID CHECK)
@@ -78,6 +94,7 @@ shinyServer(function(input, output) {
         toupper(input$stn.id)
     }) # EOF id.check()
 
+    
     # Station Name
     output$name <- renderText({
         printname <- tidyhydat::allstations %>% filter(STATION_NUMBER == id.check()) %>%
@@ -85,13 +102,15 @@ shinyServer(function(input, output) {
         printname[[1]]
     })
     
+    
     # Station Dataset
     Dataset <- reactive({
         Q_Daily = tidyhydat::hy_daily_flows(station_number = id.check(), hydat_path = Hydat_Location)
         Q_Daily
     })
 
-    # Map
+    
+    # ------------ Station Map Plotting ------------
     output$MapPlot <- renderLeaflet({
         map_data %>% 
             leaflet() %>%
@@ -99,12 +118,12 @@ shinyServer(function(input, output) {
             addMarkers(~LONGITUDE, ~LATITUDE, popup = ~text, clusterOptions = markerClusterOptions())
     })
 
-    # Data table
+    
+    # ------------ Data Table ------------
     output$table <- DT::renderDataTable({
 
             DT::datatable({
-            #TS = read.wsc.flows(station_number = id.check()) %>%
-                TS = read.wsc.flows(station_number = "08GA010") %>%
+            TS <- read.wsc.flows(station_number = id.check()) %>%
                 mutate(Year = year(Date) , Month = month(Date), Day = day(Date)) %>%
                 select(Date, Year, Month, Day, Flow, Symbol = SYM)
 
@@ -135,26 +154,8 @@ shinyServer(function(input, output) {
         })
     })
 
-    # Time Series Plot
-#    output$ts <- renderPlot({
-#
-#        TS = read.wsc.flows(station_number = id.check()) %>%
-#            select(Date, Flow, Symbol = SYM)
-#
-#       codes <- as.factor(TS$Symbol)
-#        codes <- match(codes, SYMs)
-#
-#        graphics::par(mar=c(4,4,0,0.5))
-#        mYlims <- c(0, 1.2*max(TS$Flow, na.rm = TRUE))
-#        graphics::plot(TS$Date, TS$Flow, typ = "l", col = "grey",
-#                       xlab="Date", ylab="Flow (m^3/s)", ylim=mYlims)
-#        graphics::points(TS$Date, TS$Flow,
-#                         pch=19, col=SYMcol[codes], cex=0.5)
-#        graphics::legend(TS$Date[1], 1.15*max(TS$Flow, na.rm = TRUE), SYMnames, pch=19, pt.cex=0.9, cex=0.9, col=SYMcol,
-#                         bty="n", xjust=0, x.intersp=0.5, yjust=0.5, ncol=3)
-#
-#    })
     
+    # ------------ Time Series Graph (interactive) ------------
     ### Plot an interactive graph
     output$graph <- renderDygraph({
     
@@ -220,9 +221,10 @@ shinyServer(function(input, output) {
         # call to plot    
         dy_plots
             
-    })
+    }) # End of interactive graph
     
-    # Download Data
+    
+    # Download Data button
     output$downloadData <- downloadHandler(
         filename = function() {
             paste(id.check(), ".csv", sep = "")
@@ -230,7 +232,84 @@ shinyServer(function(input, output) {
         content = function(file) {
             write.csv(Dataset(), file, row.names = FALSE)
         }
-    )
+    ) # End of csv file download
+    
+    id.check = function(){return("08FC003")}
+    # ------------ Frequency Analysis ------------
+    complete.years <- read.wsc.flows(station_number = id.check()) %>%
+                            mutate(Year = year(Date)) %>%
+                            drop_na(Flow) %>%
+                            group_by(Year) %>%
+                            count(Year) %>%
+                            filter(!(n < 350)) %>% # discard station missing more than 10 days
+                            pull(Year)
+    
+    empirical.ffa <- read.wsc.flows(station_number = id.check()) %>%
+                            filter(year(Date) %in% complete.years) %>%
+                            group_by(Year = year(Date)) %>%
+                            summarize(AMS = max(Flow)) %>%
+                            ungroup() %>%
+                            mutate(Rank = base::rank(-AMS, ties.method = "random"),
+                                   Tr = ((length(Rank)+1) / Rank)
+                                   ) %>%
+                            arrange(Rank)
+    
+    lmom_Q <- function(Qp, empirical.Tr = NA, evaluation) {
+        
+        
+        dist_list <- names(lmom.dist)
+        
+        # Custom output
+        if(evaluation == TRUE) {
+            ReturnPeriods <- empirical.Tr
+        } else{
+            ReturnPeriods <- c(1.01, 2, 5, 10, 25, 50, 100, 200, 500, 1000)
+        } 
+            
+        Pnonexc = 1 - (1/ReturnPeriods)
+        
+        
+        # samlmu() gets the sample L-moments, pelxxx() estimates the distribution's parameters from L-moments
+        # Quaxxx generates quantile given probability and distribution parameters
+        # xxx = "exp" "gam" "gev" "glo" "gno" "gpa" "gum" "kap" "ln3" "nor" "pe3" "wak" "wei"
+        
+        lmoms <- samlmu(Qp, nmom = 5)
+        log.lmoms <- samlmu(log10(Qp),nmom = 5)
+        
+        extremes <- tibble(ReturnPeriods = ReturnPeriods, 
+                           Pnonexc = Pnonexc,
+                           Qp.exp = quaexp(f = Pnonexc, para = pelexp(lmoms)), # exponential
+                           Qp.gam = quagam(f = Pnonexc, para = pelgam(lmoms)), # gamma
+                           Qp.gev = quagev(f = Pnonexc, para = pelgev(lmoms)), # generalized extreme-value
+                           Qp.glo = quaglo(f = Pnonexc, para = pelglo(lmoms)), # generalized logistic
+                           Qp.gno = quagno(f = Pnonexc, para = pelgno(lmoms)), # generalized normal
+                           Qp.gpa = quagpa(f = Pnonexc, para = pelgpa(lmoms)), # generalized pareto
+                           Qp.gum = quagum(f = Pnonexc, para = pelgum(lmoms)), # gumbel (extreme value type I)
+                           Qp.kap = quakap(f = Pnonexc, para = pelkap(lmoms)), # kappa
+                           Qp.nor = quanor(f = Pnonexc, para = pelnor(lmoms)), # normal
+                           Qp.pe3 = quape3(f = Pnonexc, para = pelpe3(lmoms)), # pearson type III
+                           Qp.wak = quawak(f = Pnonexc, para = pelwak(lmoms)), # wakeby
+                           Qp.wei = quawei(f = Pnonexc, para = pelwei(lmoms)), # weibull
+                           
+                           # Logged distribution from the package
+                           Qp.ln3 = qualn3(f = Pnonexc, para = pelln3(lmoms)), # lognormal
+                           
+                           # Manually created log distribution
+                           Qp.LP3 = 10^quape3(f = Pnonexc, para = pelpe3(log.lmoms)) # log pearson type III
+                           )
+        
+        if (evaluation == TRUE) {
+            extremes <- extremes %>% mutate(Qp.obs = Qp) # observed Qp
+        } 
+    
+        return(extremes) 
+    }
+    
+    GOF.input <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = empirical.ffa$Tr, evaluation = TRUE) %>%
+        select(-ReturnPeriods)
+    
+    lm(Qp.obs ~ Qp.gam, data = GOF.input) %>% stats::AIC()
+    
 
 })
 
