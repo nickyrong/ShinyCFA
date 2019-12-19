@@ -71,19 +71,29 @@ SYMs <- c("", "E", "A", "B", "D", "R")
 SYMnames <- c("No Code", "Estimate", "Partial Day", "Ice Conditions", "Dry", "Revised")
 SYMcol <- c("grey", "#E41A1C", "#4DAF4A", "#377EB8", "#FF7F00", "#984EA3")
 
+# Distributions List
+Dist_Options <- c("Exponential", "Gamma", "GEV", "GEV-Log", "GEV-Normal", "GEV-Pareto",
+                  "Gumbel", "Kappa", "Normal", "LPIII", "Wakeby", "Weibull")
+Dist_Key <- c("Qp.exp", "Qp.gam", "Qp.gev", "Qp.glo", "Qp.gno", "Qp.gpa",
+              "Qp.gum", "Qp.kap", "Qp.nor", "Qp.pe3", "Qp.wak", "Qp.wei")
+
 # ---------------- FFA FUNCTION ------------------
 lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
     
     #dist_list <- names(lmom.dist) ***NICK, WHAT IS THIS?***
     
     # Custom output
-    if(evaluation == TRUE) {
+    if(evaluation == TRUE) (
         ReturnPeriods <- empirical.Tr
-    } else if(evaluation == "Plot") {
+    ) else if(evaluation == "Plot") (
         ReturnPeriods  <- 1:1000
-    } else {
-        ReturnPeriods <- c(1.01, 2, 5, 10, 25, 50, 100, 200, 500, 1000)
-    }
+    ) else (
+        if (is.na(empirical.Tr) == TRUE) (
+            ReturnPeriods <- c(1.01, 2, 5, 10, 25, 50, 100, 200, 500, 1000)
+        ) else (
+            ReturnPeriods <- sort(empirical.Tr)
+        )
+    )
     
     Pnonexc = 1 - (1/ReturnPeriods)
     
@@ -323,25 +333,43 @@ shinyServer(function(input, output) {
         
         DT::datatable({
             
-            ffa_results <- lmom_Q(Qp = empirical.ffa$AMS) %>%
-                round(digits = 0)
+            desired_columns <- Dist_Key[match(input$selector_dist, Dist_Options)]
+            #& input$selector_Tr[1] == 200
+            if (length(input$selector_Tr) < 1) (
+                ffa_results <- lmom_Q(Qp = empirical.ffa$AMS) %>%
+                    mutate_at(vars(-Pnonexc), funs(round(., 0))) %>%
+                    mutate_at(vars(Pnonexc), funs(round(., 3))) %>%
+                    select(ReturnPeriods, Pnonexc, !!desired_columns)
+                
+            ) else (
+                ffa_results <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = as.integer(input$selector_Tr)) %>%
+                    mutate_at(vars(-Pnonexc), funs(round(., 0))) %>%
+                    mutate_at(vars(Pnonexc), funs(round(., 3))) %>%
+                    select(ReturnPeriods, Pnonexc, !!desired_columns)
+            )
             
             ffa_results
         })
     })
     
     output$ffa.figure <- renderPlotly({
+        
+        desired_columns <- Dist_Key[match(input$selector_dist, Dist_Options)]
+        
         ffa_results <- lmom_Q(Qp = empirical.ffa$AMS, evaluation = "Plot") %>%
-            round(digits = 0) %>% select(-Pnonexc)
+            round(digits = 0) %>% select(-Pnonexc) %>%
+            select(ReturnPeriods, !!desired_columns)
             
         ffa_results <- gather(ffa_results, "Distribution", "Q", -1)
-            
-        ffa_plot <- ggplot(ffa_results, aes(x = ReturnPeriods, y = Q, color = Distribution)) + 
-            geom_line() + theme_bw() +
-            scale_y_continuous(limits=c(0, NA)) + 
-            geom_point(data = empirical.ffa, aes(x = Tr, y = AMS, colour = "Observed"))
-            
-        ggplotly(ffa_plot)
+        
+        if (length(desired_columns) > 0) (
+            ffa_plot <- ggplot(ffa_results, aes(x = ReturnPeriods, y = Q, color = Distribution)) + 
+                geom_line() + theme_bw() +
+                scale_y_continuous(limits=c(0, NA)) + 
+                geom_point(data = empirical.ffa, aes(x = Tr, y = AMS, colour = "Observed")) +
+                scale_x_log10()
+        )
+        if (length(desired_columns) > 0) (ggplotly(ffa_plot))
     })
     
 })

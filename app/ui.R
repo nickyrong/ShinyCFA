@@ -4,6 +4,12 @@ library(leaflet)
 library(dygraphs)
 library(plotly)
 
+# Lists
+Dist_Options <- c("Exponential", "Gamma", "GEV", "GEV-Log", "GEV-Normal", "GEV-Pareto",
+                  "Gumbel", "Kappa", "Normal", "LPIII", "Wakeby", "Weibull")
+Tr_Options <- c(1, 2, 5, 10, 20, 25, 30, 40, 50, 75, 100, 200, 250, 300,
+                400, 500, 1000, 2500, 10000)
+
 
 # Define UI for application that draws a histogram
 shinyUI(fluidPage(
@@ -69,7 +75,12 @@ shinyUI(fluidPage(
                 ),
                 
                 tabPanel("Frequency Analysis",
-                    h3("This page is under construction"),
+                    br(),
+                    selectizeInput('selector_dist', 'Select Distributions',
+                                   choices = Dist_Options, multiple = TRUE),
+                    selectizeInput('selector_Tr', 'Select Return Periods (Years)', 
+                                   choices = Tr_Options, multiple = TRUE, 
+                                   options = list(maxItems = 10), selected = 200),
                     DT::dataTableOutput("ffa.table"),
                     br(), br(),
                     plotlyOutput("ffa.figure")
