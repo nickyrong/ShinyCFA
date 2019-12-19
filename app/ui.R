@@ -2,6 +2,7 @@ rm(list=ls())
 library(shiny)
 library(leaflet)
 library(dygraphs)
+library(plotly)
 
 
 # Define UI for application that draws a histogram
@@ -68,7 +69,11 @@ shinyUI(fluidPage(
                 ),
                 
                 tabPanel("Frequency Analysis",
-                    h3("This page is under construction")
+                    h3("This page is under construction"),
+                    DT::dataTableOutput("ffa.table"),
+                    br(), br(),
+                    plotlyOutput("ffa.figure")
+                    
                 )
                 
             ) # End of tabsetPanel

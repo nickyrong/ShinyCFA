@@ -9,6 +9,7 @@ library(xts)
 library(dygraphs)
 library(tidyverse)
 library(lmom)
+library(plotly)
 
 
 # ------------ HYDAT database loading ------------
@@ -70,6 +71,57 @@ SYMs <- c("", "E", "A", "B", "D", "R")
 SYMnames <- c("No Code", "Estimate", "Partial Day", "Ice Conditions", "Dry", "Revised")
 SYMcol <- c("grey", "#E41A1C", "#4DAF4A", "#377EB8", "#FF7F00", "#984EA3")
 
+# ---------------- FFA FUNCTION ------------------
+lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
+    
+    #dist_list <- names(lmom.dist) ***NICK, WHAT IS THIS?***
+    
+    # Custom output
+    if(evaluation == TRUE) {
+        ReturnPeriods <- empirical.Tr
+    } else if(evaluation == "Plot") {
+        ReturnPeriods  <- 1:1000
+    } else {
+        ReturnPeriods <- c(1.01, 2, 5, 10, 25, 50, 100, 200, 500, 1000)
+    }
+    
+    Pnonexc = 1 - (1/ReturnPeriods)
+    
+    # samlmu() gets the sample L-moments, pelxxx() estimates the distribution's parameters from L-moments
+    # Quaxxx generates quantile given probability and distribution parameters
+    # xxx = "exp" "gam" "gev" "glo" "gno" "gpa" "gum" "kap" "ln3" "nor" "pe3" "wak" "wei"
+    
+    lmoms <- samlmu(Qp, nmom = 5)
+    log.lmoms <- samlmu(log10(Qp),nmom = 5)
+    
+    extremes <- tibble(ReturnPeriods = ReturnPeriods, 
+                       Pnonexc = Pnonexc,
+                       Qp.exp = quaexp(f = Pnonexc, para = pelexp(lmoms)), # exponential
+                       Qp.gam = quagam(f = Pnonexc, para = pelgam(lmoms)), # gamma
+                       Qp.gev = quagev(f = Pnonexc, para = pelgev(lmoms)), # generalized extreme-value
+                       Qp.glo = quaglo(f = Pnonexc, para = pelglo(lmoms)), # generalized logistic
+                       Qp.gno = quagno(f = Pnonexc, para = pelgno(lmoms)), # generalized normal
+                       Qp.gpa = quagpa(f = Pnonexc, para = pelgpa(lmoms)), # generalized pareto
+                       Qp.gum = quagum(f = Pnonexc, para = pelgum(lmoms)), # gumbel (extreme value type I)
+                       Qp.kap = quakap(f = Pnonexc, para = pelkap(lmoms)), # kappa
+                       Qp.nor = quanor(f = Pnonexc, para = pelnor(lmoms)), # normal
+                       Qp.pe3 = quape3(f = Pnonexc, para = pelpe3(lmoms)), # pearson type III
+                       Qp.wak = quawak(f = Pnonexc, para = pelwak(lmoms)), # wakeby
+                       Qp.wei = quawei(f = Pnonexc, para = pelwei(lmoms)), # weibull
+                       
+                       # Logged distribution from the package
+                       Qp.ln3 = qualn3(f = Pnonexc, para = pelln3(lmoms)), # lognormal
+                       
+                       # Manually created log distribution
+                       Qp.LP3 = 10^quape3(f = Pnonexc, para = pelpe3(log.lmoms)) # log pearson type III
+    )
+    
+    if (evaluation == TRUE) {
+        extremes <- extremes %>% mutate(Qp.obs = Qp) # observed Qp
+    } 
+    
+    return(extremes) 
+}
 
 
 # ------------ Shiny Server In/Output ------------
@@ -234,82 +286,62 @@ shinyServer(function(input, output) {
         }
     ) # End of csv file download
     
-    id.check = function(){return("08FC003")}
+    #id.check = function(){return("08FC003")}
+    
     # ------------ Frequency Analysis ------------
-    complete.years <- read.wsc.flows(station_number = id.check()) %>%
-                            mutate(Year = year(Date)) %>%
-                            drop_na(Flow) %>%
-                            group_by(Year) %>%
-                            count(Year) %>%
-                            filter(!(n < 350)) %>% # discard station missing more than 10 days
-                            pull(Year)
     
-    empirical.ffa <- read.wsc.flows(station_number = id.check()) %>%
-                            filter(year(Date) %in% complete.years) %>%
-                            group_by(Year = year(Date)) %>%
-                            summarize(AMS = max(Flow)) %>%
-                            ungroup() %>%
-                            mutate(Rank = base::rank(-AMS, ties.method = "random"),
-                                   Tr = ((length(Rank)+1) / Rank)
-                                   ) %>%
-                            arrange(Rank)
+    # Reactive statement to generate dataframes for FFA
+    # Note that this should be modified so that the FFA only run when a button in the tab is pressed
+    # This will avoid unnecessary loading
+    FFA <- reactive({
+        complete.years <- read.wsc.flows(station_number = id.check()) %>%
+            mutate(Year = year(Date)) %>%
+            drop_na(Flow) %>%
+            group_by(Year) %>%
+            count(Year) %>%
+            filter(!(n < 350)) %>% # discard station missing more than 10 days
+            pull(Year)
+        
+        empirical.ffa <- read.wsc.flows(station_number = id.check()) %>%
+            filter(year(Date) %in% complete.years) %>%
+            group_by(Year = year(Date)) %>%
+            summarize(AMS = max(Flow)) %>%
+            ungroup() %>%
+            mutate(Rank = base::rank(-AMS, ties.method = "random"),
+                   Tr = ((length(Rank)+1) / Rank)
+            ) %>%
+            arrange(Rank)
+        
+        GOF.input <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = empirical.ffa$Tr, evaluation = TRUE) %>%
+            select(-ReturnPeriods)
+        
+        lm(Qp.obs ~ Qp.gam, data = GOF.input) %>% stats::AIC()
+        
+    })
     
-    lmom_Q <- function(Qp, empirical.Tr = NA, evaluation) {
+    output$ffa.table <- DT::renderDataTable({
         
-        
-        dist_list <- names(lmom.dist)
-        
-        # Custom output
-        if(evaluation == TRUE) {
-            ReturnPeriods <- empirical.Tr
-        } else{
-            ReturnPeriods <- c(1.01, 2, 5, 10, 25, 50, 100, 200, 500, 1000)
-        } 
+        DT::datatable({
             
-        Pnonexc = 1 - (1/ReturnPeriods)
-        
-        
-        # samlmu() gets the sample L-moments, pelxxx() estimates the distribution's parameters from L-moments
-        # Quaxxx generates quantile given probability and distribution parameters
-        # xxx = "exp" "gam" "gev" "glo" "gno" "gpa" "gum" "kap" "ln3" "nor" "pe3" "wak" "wei"
-        
-        lmoms <- samlmu(Qp, nmom = 5)
-        log.lmoms <- samlmu(log10(Qp),nmom = 5)
-        
-        extremes <- tibble(ReturnPeriods = ReturnPeriods, 
-                           Pnonexc = Pnonexc,
-                           Qp.exp = quaexp(f = Pnonexc, para = pelexp(lmoms)), # exponential
-                           Qp.gam = quagam(f = Pnonexc, para = pelgam(lmoms)), # gamma
-                           Qp.gev = quagev(f = Pnonexc, para = pelgev(lmoms)), # generalized extreme-value
-                           Qp.glo = quaglo(f = Pnonexc, para = pelglo(lmoms)), # generalized logistic
-                           Qp.gno = quagno(f = Pnonexc, para = pelgno(lmoms)), # generalized normal
-                           Qp.gpa = quagpa(f = Pnonexc, para = pelgpa(lmoms)), # generalized pareto
-                           Qp.gum = quagum(f = Pnonexc, para = pelgum(lmoms)), # gumbel (extreme value type I)
-                           Qp.kap = quakap(f = Pnonexc, para = pelkap(lmoms)), # kappa
-                           Qp.nor = quanor(f = Pnonexc, para = pelnor(lmoms)), # normal
-                           Qp.pe3 = quape3(f = Pnonexc, para = pelpe3(lmoms)), # pearson type III
-                           Qp.wak = quawak(f = Pnonexc, para = pelwak(lmoms)), # wakeby
-                           Qp.wei = quawei(f = Pnonexc, para = pelwei(lmoms)), # weibull
-                           
-                           # Logged distribution from the package
-                           Qp.ln3 = qualn3(f = Pnonexc, para = pelln3(lmoms)), # lognormal
-                           
-                           # Manually created log distribution
-                           Qp.LP3 = 10^quape3(f = Pnonexc, para = pelpe3(log.lmoms)) # log pearson type III
-                           )
-        
-        if (evaluation == TRUE) {
-            extremes <- extremes %>% mutate(Qp.obs = Qp) # observed Qp
-        } 
+            ffa_results <- lmom_Q(Qp = empirical.ffa$AMS) %>%
+                round(digits = 0)
+            
+            ffa_results
+        })
+    })
     
-        return(extremes) 
-    }
+    output$ffa.figure <- renderPlotly({
+        ffa_results <- lmom_Q(Qp = empirical.ffa$AMS, evaluation = "Plot") %>%
+            round(digits = 0) %>% select(-Pnonexc)
+            
+        ffa_results <- gather(ffa_results, "Distribution", "Q", -1)
+            
+        ffa_plot <- ggplot(ffa_results, aes(x = ReturnPeriods, y = Q, color = Distribution)) + 
+            geom_line() + theme_bw() +
+            scale_y_continuous(limits=c(0, NA)) + 
+            geom_point(data = empirical.ffa, aes(x = Tr, y = AMS, colour = "Observed"))
+            
+        ggplotly(ffa_plot)
+    })
     
-    GOF.input <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = empirical.ffa$Tr, evaluation = TRUE) %>%
-        select(-ReturnPeriods)
-    
-    lm(Qp.obs ~ Qp.gam, data = GOF.input) %>% stats::AIC()
-    
-
 })
-
