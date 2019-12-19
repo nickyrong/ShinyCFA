@@ -30,19 +30,7 @@ shinyUI(fluidPage(
 
         mainPanel(
             tabsetPanel(
-                tabPanel("Read Me",
-                         br(),
-                         "This app allows the user to enter a Water Survey of Canada Hydrometric Station ID to view streamflow data.",
-                         br(), br(),
-                         "Still in development phase and !!!NOT SUITABLE FOR ASSIGNMENTS!!!",
-                         br(), br(),
-                         "Next phase is to include frequency analysis functionality. Contact Nate/Nick if you have any suggestions or bugs to report",
-                         br(), br(),
-                         "The Map tab plots the locations of the hydrometric stations",
-                         br(), br(),
-                         "The Data Table tab shows tabular data for the selected station in either daily, monthly, or yearly formats",
-                         br(), br(),
-                         "The Time Series tab plots a graph of the data and colour codes values based on data flags"
+                tabPanel("Read Me", htmlOutput("ReadMe_HTML")
                 ),
 
                 tabPanel("Stations Map",

@@ -140,6 +140,15 @@ lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
 # Define server logic
 shinyServer(function(input, output) {
     
+    # ----------- For the ReadMe HTML -----------
+    # Directly using includeHTML in ui.R will break Shiny (stop execution of everything follows)
+    
+    output$ReadMe_HTML <- renderUI({
+        includeHTML("ReadMe.html")
+        
+    })
+    
+    
     # Status if station is invalid
     output$status <- renderText({
         if (!(toupper(input$stn.id) %in% tidyhydat::allstations$STATION_NUMBER)) {
