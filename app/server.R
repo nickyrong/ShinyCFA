@@ -19,7 +19,7 @@ if(file.exists("./database/Hydat.sqlite3")) {
     Hydat_Location <- "./database/Hydat.sqlite3"
 } else {
     Hydat_Location <- tidyhydat::hy_default_db()
-    }
+}
 
 
 # ------------ Station Map Plotting ------------
@@ -71,7 +71,7 @@ SYMs <- c("", "E", "A", "B", "D", "R")
 SYMnames <- c("No Code", "Estimate", "Partial Day", "Ice Conditions", "Dry", "Revised")
 SYMcol <- c("grey", "#E41A1C", "#4DAF4A", "#377EB8", "#FF7F00", "#984EA3")
 
-# Distributions List
+# Distributions List for Flood Frequency Analyis (FFA)
 Dist_Options <- c("Exponential", "Gamma", "GEV", "GEV-Log", "GEV-Normal", "GEV-Pareto",
                   "Gumbel", "Kappa", "Normal", "LPIII", "Wakeby", "Weibull")
 Dist_Key <- c("Qp.exp", "Qp.gam", "Qp.gev", "Qp.glo", "Qp.gno", "Qp.gpa",
@@ -131,7 +131,7 @@ lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
     } 
     
     return(extremes) 
-}
+} # End of Flood Frequency Function
 
 
 # ------------ Shiny Server In/Output ------------
@@ -171,6 +171,37 @@ shinyServer(function(input, output) {
         Q_Daily
     })
 
+    # Station Dataset Summarized
+    # Uses user input from the resoluction dropdown
+    Dataset_Summarize <- reactive({
+        TS <- read.wsc.flows(station_number = id.check()) %>%
+            mutate(Year = year(Date) , Month = month(Date), Day = day(Date)) %>%
+            select(Date, Year, Month, Day, Flow, Symbol = SYM)
+        
+        codes <- as.factor(TS$Symbol)
+        codes <- match(codes, SYMs)
+        codes <- SYMnames[codes]
+        
+        TS <- mutate(TS, Flag = codes) %>% select(-Symbol)
+        
+        if(input$Reso == "Daily"){
+            TS$Flow <- round(TS$Flow, digits = 0)
+        }
+        
+        else if(input$Reso == "Monthly"){
+            TS <- TS %>% group_by(Year, Month) %>%
+                summarise(Average_Flow = mean(Flow, na.rm = TRUE), Count = sum(is.na(Flow)==FALSE))
+            TS$Average_Flow <- round(TS$Average_Flow, digits = 0)
+        }
+        
+        else if(input$Reso == "Yearly"){
+            TS <- TS %>% group_by(Year) %>%
+                summarise(Average_Flow = mean(Flow, na.rm = TRUE), Max_Daily = max(Flow, na.rm = TRUE),
+                          Min_Daily = min(Flow, na.rm = TRUE), Count = sum(is.na(Flow) == FALSE)) %>% 
+                round(digits = 0)
+        }
+        TS
+    })
     
     # ------------ Station Map Plotting ------------
     output$MapPlot <- renderLeaflet({
@@ -181,41 +212,43 @@ shinyServer(function(input, output) {
     })
 
     
-    # ------------ Data Table ------------
+    # ------------ Data Table ----------------------
     output$table <- DT::renderDataTable({
-
-            DT::datatable({
-            TS <- read.wsc.flows(station_number = id.check()) %>%
-                mutate(Year = year(Date) , Month = month(Date), Day = day(Date)) %>%
-                select(Date, Year, Month, Day, Flow, Symbol = SYM)
-
-            codes <- as.factor(TS$Symbol)
-            codes <- match(codes, SYMs)
-            codes <- SYMnames[codes]
-
-            TS <- mutate(TS, Flag = codes) %>% select(-Symbol)
-
-            if(input$Reso == "Daily"){
-                TS$Flow <- round(TS$Flow, digits = 0)
-                TS
-            }
-
-            else if(input$Reso == "Monthly"){
-                TS <- TS %>% group_by(Year, Month) %>%
-                    summarise(Average_Flow = mean(Flow, na.rm = TRUE), Count = sum(is.na(Flow)==FALSE))
-                TS$Average_Flow <- round(TS$Average_Flow, digits = 0)
-                TS
-            }
-            else if(input$Reso == "Yearly"){
-                TS <- TS %>% group_by(Year) %>%
-                    summarise(Average_Flow = mean(Flow, na.rm = TRUE), Max_Daily = max(Flow, na.rm = TRUE),
-                              Min_Daily = min(Flow, na.rm = TRUE), Count = sum(is.na(Flow) == FALSE)) %>% 
-                    round(digits = 0)
-                TS
-            }
-        })
+            
+        Dataset_Summarize() %>% DT::datatable(
+                # Data table formatting options
+                extensions = c('Buttons', 'FixedColumns', 'Scroller'),
+                options = list(
+                    
+                    # Options for extension "Buttons"
+                    dom = 'Bfrtip',
+                    
+                    buttons = list(I('colvis')),
+                    
+                    columnDefs = list(list(className = "dt-center", targets = "_all")),
+                    
+                    # Options for extension "FixedColumns"
+                    scrollX = TRUE,
+                    fixedColumns = TRUE,
+                    
+                    # Options for extension "Scroller"
+                    deferRender = TRUE,
+                    scrollY = 600,
+                    scroller = TRUE
+                )
+        )
+        
     })
-
+    
+    # ------------ Download Data Table ------------
+    output$downloadSummary <- downloadHandler(
+        filename = function() {
+            paste(id.check(), "_", as.character(input$Reso),".csv", sep = "")
+        },
+        content = function(file) {
+            write.csv(Dataset_Summarize(), file, row.names = FALSE)
+        }
+    )
     
     # ------------ Time Series Graph (interactive) ------------
     ### Plot an interactive graph
@@ -301,8 +334,6 @@ shinyServer(function(input, output) {
     # ------------ Frequency Analysis ------------
     
     # Reactive statement to generate dataframes for FFA
-    # Note that this should be modified so that the FFA only run when a button in the tab is pressed
-    # This will avoid unnecessary loading
     FFA <- reactive({
         complete.years <- read.wsc.flows(station_number = id.check()) %>%
             mutate(Year = year(Date)) %>%
@@ -329,29 +360,50 @@ shinyServer(function(input, output) {
         
     })
     
+    # ------------ FFA DataTable ------------
     output$ffa.table <- DT::renderDataTable({
-        
-        DT::datatable({
             
-            desired_columns <- Dist_Key[match(input$selector_dist, Dist_Options)]
-            #& input$selector_Tr[1] == 200
-            if (length(input$selector_Tr) < 1) (
-                ffa_results <- lmom_Q(Qp = empirical.ffa$AMS) %>%
-                    mutate_at(vars(-Pnonexc), funs(round(., 0))) %>%
-                    mutate_at(vars(Pnonexc), funs(round(., 3))) %>%
-                    select(ReturnPeriods, Pnonexc, !!desired_columns)
+        desired_columns <- Dist_Key[match(input$selector_dist, Dist_Options)]
+
+        if (length(input$selector_Tr) < 1) (
+            ffa_results <- lmom_Q(Qp = empirical.ffa$AMS) %>%
+                mutate_at(vars(-Pnonexc), funs(round(., 0))) %>%
+                mutate_at(vars(Pnonexc), funs(round(., 3))) %>%
+                select(ReturnPeriods, Pnonexc, !!desired_columns) %>%
+                rename("Return Periods" = ReturnPeriods, "Probability Non-Exc" = Pnonexc)
                 
-            ) else (
-                ffa_results <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = as.integer(input$selector_Tr)) %>%
-                    mutate_at(vars(-Pnonexc), funs(round(., 0))) %>%
-                    mutate_at(vars(Pnonexc), funs(round(., 3))) %>%
-                    select(ReturnPeriods, Pnonexc, !!desired_columns)
-            )
+        ) else (
+            ffa_results <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = as.integer(input$selector_Tr)) %>%
+                mutate_at(vars(-Pnonexc), funs(round(., 0))) %>%
+                mutate_at(vars(Pnonexc), funs(round(., 3))) %>%
+                select(ReturnPeriods, Pnonexc, !!desired_columns) %>%
+                rename("Return Periods" = ReturnPeriods, "Probability Non-Exc" = Pnonexc)
+        )
             
-            ffa_results
-        })
+        ffa_results %>% DT::datatable(
+            # Options for data table formatting
+            extensions = c('Buttons', 'FixedColumns'),
+            options = list(
+                
+                # Options for extension "Buttons"
+                dom = 'Bfrtip',
+                
+                buttons = list(I('colvis')),
+                
+                columnDefs = list(list(className = "dt-center", targets = "_all")),
+                
+                # Options for extension "FixedColumns"
+                scrollX = TRUE,
+                
+                # Options for extension "Scroller"
+                deferRender = TRUE,
+                scroller = TRUE
+                
+            )
+        )
     })
     
+    # ------------ FFA Plot ------------
     output$ffa.figure <- renderPlotly({
         
         desired_columns <- Dist_Key[match(input$selector_dist, Dist_Options)]
@@ -364,12 +416,27 @@ shinyServer(function(input, output) {
         
         if (length(desired_columns) > 0) (
             ffa_plot <- ggplot(ffa_results, aes(x = ReturnPeriods, y = Q, color = Distribution)) + 
-                geom_line() + theme_bw() +
-                scale_y_continuous(limits=c(0, NA)) + 
-                geom_point(data = empirical.ffa, aes(x = Tr, y = AMS, colour = "Observed")) +
-                scale_x_log10()
+                            geom_line() + theme_bw() +
+                            scale_y_continuous(name = "Q (m3/s)", limits=c(0, NA)) +
+                            geom_point(data = empirical.ffa, aes(x = Tr, y = AMS, colour = "Observed")) +
+                            scale_x_log10(name = "Annual Return Periods") +
+                            ggtitle("Flood Frequency Analysis")
         )
         if (length(desired_columns) > 0) (ggplotly(ffa_plot))
+    })
+    
+    
+    # ------------ AMS Plot ------------
+    output$max.figure <- renderPlotly({
+        
+        max_plot <- ggplot(empirical.ffa, aes(x = Year, y = AMS)) + 
+                        geom_point() + theme_bw() +
+                        scale_y_continuous(name = "Q (m3/s)", limits=c(0, NA)) +
+                        scale_x_continuous(name = "Year", limits=c(NA, NA)) +
+                        ggtitle("Annual Daily Maximum Series")
+        
+
+        ggplotly(max_plot)
     })
     
 })

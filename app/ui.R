@@ -23,7 +23,7 @@ shinyUI(fluidPage(
             "Enter a valid WSC Station ID",
             br(), br(),
             textInput("stn.id", label = h3("WSC Station ID"), value = "08GA010"),
-            downloadButton("downloadData", "Download Station Data"),
+            downloadButton("downloadData", "Download Data"),
             br(),
             h3(textOutput("status"))
         ),
@@ -63,6 +63,8 @@ shinyUI(fluidPage(
                          "Select Daily, Monthly, or Yearly Resolution",
                          selectInput("Reso", "", c("Daily" = "Daily", "Monthly" = "Monthly", "Yearly" = "Yearly"),
                                      selected = "Daily"), p(""),
+                         downloadButton("downloadSummary", "Download Summary Data"),
+                         br(), br(),
                          DT::dataTableOutput("table")
                 ),
 
@@ -83,7 +85,9 @@ shinyUI(fluidPage(
                                    options = list(maxItems = 10), selected = 200),
                     DT::dataTableOutput("ffa.table"),
                     br(), br(),
-                    plotlyOutput("ffa.figure")
+                    plotlyOutput("ffa.figure"),
+                    br(), br(),
+                    plotlyOutput("max.figure")
                     
                 )
                 
