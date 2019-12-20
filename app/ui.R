@@ -5,9 +5,9 @@ library(dygraphs)
 library(plotly)
 
 # Lists
-Dist_Options <- c("Exponential", "Gamma", "GEV", "GEV-Log", "GEV-Normal", "GEV-Pareto",
-                  "Gumbel", "Kappa", "Normal", "LPIII", "Wakeby", "Weibull")
-Tr_Options <- c(1, 2, 5, 10, 20, 25, 30, 40, 50, 75, 100, 200, 250, 300,
+Dist_Options <- c("Exponential", "Gamma", "GEV", "Gen. Logistic", "Gen. Normal", "Gen. Pareto",
+                  "Gumbel", "Kappa", "Normal", "Pearson III", "Wakeby", "Weibull", "Log-Normal", "LP3")
+Tr_Options <- c(1.01, 2, 5, 10, 20, 25, 30, 40, 50, 75, 100, 200, 250, 300,
                 400, 500, 1000, 2500, 10000)
 
 

@@ -72,28 +72,21 @@ SYMnames <- c("No Code", "Estimate", "Partial Day", "Ice Conditions", "Dry", "Re
 SYMcol <- c("grey", "#E41A1C", "#4DAF4A", "#377EB8", "#FF7F00", "#984EA3")
 
 # Distributions List for Flood Frequency Analyis (FFA)
-Dist_Options <- c("Exponential", "Gamma", "GEV", "GEV-Log", "GEV-Normal", "GEV-Pareto",
-                  "Gumbel", "Kappa", "Normal", "LPIII", "Wakeby", "Weibull")
+Dist_Options <- c("Exponential", "Gamma", "GEV", "Gen. Logistic", "Gen. Normal", "Gen. Pareto",
+                  "Gumbel", "Kappa", "Normal", "Pearson III", "Wakeby", "Weibull", "Log-Normal", "LP3")
 Dist_Key <- c("Qp.exp", "Qp.gam", "Qp.gev", "Qp.glo", "Qp.gno", "Qp.gpa",
-              "Qp.gum", "Qp.kap", "Qp.nor", "Qp.pe3", "Qp.wak", "Qp.wei")
+              "Qp.gum", "Qp.kap", "Qp.nor", "Qp.pe3", "Qp.wak", "Qp.wei", "Qp.ln3", "Qp.LP3")
 
 # ---------------- FFA FUNCTION ------------------
 lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
     
-    #dist_list <- names(lmom.dist) ***NICK, WHAT IS THIS?***
     
     # Custom output
-    if(evaluation == TRUE) (
-        ReturnPeriods <- empirical.Tr
-    ) else if(evaluation == "Plot") (
-        ReturnPeriods  <- 1:1000
+    if(evaluation == "Plot") (
+        ReturnPeriods  <- 1000:1
     ) else (
-        if (is.na(empirical.Tr) == TRUE) (
-            ReturnPeriods <- c(1.01, 2, 5, 10, 25, 50, 100, 200, 500, 1000)
-        ) else (
-            ReturnPeriods <- sort(empirical.Tr)
-        )
-    )
+        ReturnPeriods <- sort(empirical.Tr, decreasing = TRUE)
+    ) 
     
     Pnonexc = 1 - (1/ReturnPeriods)
     
@@ -362,10 +355,10 @@ shinyServer(function(input, output) {
             ) %>%
             arrange(Rank)
         
-        #GOF.input <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = empirical.ffa$Tr, evaluation = TRUE) %>%
-            #select(-ReturnPeriods)
+        GOF.input <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = empirical.ffa$Tr, evaluation = TRUE) 
         
-        #lm(Qp.obs ~ Qp.gam, data = GOF.input) %>% stats::AIC()
+        GOF.input %>% select(starts_with("Qp"), -ends_with("obs")) %>% names()
+        lm(Qp.obs ~ Qp.gam, data = GOF.input) %>% stats::AIC()
         
         empirical.ffa
         
