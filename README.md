@@ -40,7 +40,8 @@ To run the app you need to do the following:
 1) Install [R](https://cran.r-project.org/)
 2) Install [RStudio](https://rstudio.com/products/rstudio/download/) (just the free version)
 3) Install the required R Packages (see dependcies.R file for the list)
-4) Install the HYDAT Database using the tidyhydat function download_hydat()  
+4) Install the HYDAT Database using the tidyhydat function download_hydat()
+5) Open the server.R and ui.R scripts in RStudio and click the Run App button
 
 3 and 4 can be alternatively completed by running the dependencies.R script
 <br/>
