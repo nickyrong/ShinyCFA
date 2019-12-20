@@ -442,6 +442,7 @@ shinyServer(function(input, output) {
     # ------------ AMS Plot ------------
     output$max.figure <- renderPlotly({
         
+        empirical.ffa <- FFA()
         max_plot <- ggplot(empirical.ffa, aes(x = Year, y = AMS)) + 
                         geom_point() + theme_bw() +
                         scale_y_continuous(name = "Q (m3/s)", limits=c(0, NA)) +
