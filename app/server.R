@@ -362,16 +362,19 @@ shinyServer(function(input, output) {
             ) %>%
             arrange(Rank)
         
-        GOF.input <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = empirical.ffa$Tr, evaluation = TRUE) %>%
-            select(-ReturnPeriods)
+        #GOF.input <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = empirical.ffa$Tr, evaluation = TRUE) %>%
+            #select(-ReturnPeriods)
         
-        lm(Qp.obs ~ Qp.gam, data = GOF.input) %>% stats::AIC()
+        #lm(Qp.obs ~ Qp.gam, data = GOF.input) %>% stats::AIC()
+        
+        empirical.ffa
         
     })
     
     # ------------ FFA DataTable ------------
     output$ffa.table <- DT::renderDataTable({
-            
+        
+        empirical.ffa <- FFA()    
         desired_columns <- Dist_Key[match(input$selector_dist, Dist_Options)]
 
         if (length(input$selector_Tr) < 1) (
@@ -415,6 +418,7 @@ shinyServer(function(input, output) {
     # ------------ FFA Plot ------------
     output$ffa.figure <- renderPlotly({
         
+        empirical.ffa <- FFA()
         desired_columns <- Dist_Key[match(input$selector_dist, Dist_Options)]
         
         ffa_results <- lmom_Q(Qp = empirical.ffa$AMS, evaluation = "Plot") %>%
