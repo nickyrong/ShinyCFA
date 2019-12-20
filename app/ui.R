@@ -15,9 +15,9 @@ Tr_Options <- c(1.01, 2, 5, 10, 20, 25, 30, 40, 50, 75, 100, 200, 250, 300,
 shinyUI(fluidPage(
 
     pageWithSidebar(
-        
+
         headerPanel('Water Survey of Canada Hydrometric Stations'),
-        
+
         sidebarPanel(
             width = 3,
             "Enter a valid WSC Station ID",
@@ -56,33 +56,33 @@ shinyUI(fluidPage(
                          DT::dataTableOutput("table")
                 ),
 
-                
+
                 tabPanel("Time Series",
                          br(),
                          dygraphOutput(outputId = "graph", height = "600px"),
                          br(),
                          "This is an interactive graph: drag to zoom in and double click to zoom out"
                 ),
-                
+
                 tabPanel("Frequency Analysis",
                     br(),
                     selectizeInput('selector_dist', 'Select Distributions',
                                    choices = Dist_Options, multiple = TRUE),
-                    selectizeInput('selector_Tr', 'Select Return Periods (Years)', 
-                                   choices = Tr_Options, multiple = TRUE, 
+                    selectizeInput('selector_Tr', 'Select Return Periods (Years)',
+                                   choices = Tr_Options, multiple = TRUE,
                                    options = list(maxItems = 10), selected = 200),
                     DT::dataTableOutput("ffa.table"),
                     br(), br(),
                     plotlyOutput("ffa.figure"),
                     br(), br(),
                     plotlyOutput("max.figure")
-                    
+
                 )
-                
+
             ) # End of tabsetPanel
-            
+
         ) # End of main panel
-        
+
     ) # End of pageWithSidebar
-    
+
 )) # End of shinyUI & fluidPage

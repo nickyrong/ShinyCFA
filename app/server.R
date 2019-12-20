@@ -25,12 +25,12 @@ if(file.exists("./database/Hydat.sqlite3")) {
 # ------------ Station Map Plotting ------------
 
 # Generate the data for the map by calling coordinates, labels, and date ranges from the HYDAT database
-range.df <-  tidyhydat::hy_stn_data_range(hydat_path = Hydat_Location) %>% 
-    
+range.df <-  tidyhydat::hy_stn_data_range(hydat_path = Hydat_Location) %>%
+
     # Grab Flow record range (Q)
     filter(DATA_TYPE == "Q") %>%
     select(STATION_NUMBER, Qfrom = Year_from, Qto = Year_to, Qn = RECORD_LENGTH) %>%
-    
+
     # Grab Stage record range (H) and append to the df
     left_join(
         tidyhydat::hy_stn_data_range(hydat_path = Hydat_Location) %>%
@@ -41,8 +41,8 @@ range.df <-  tidyhydat::hy_stn_data_range(hydat_path = Hydat_Location) %>%
 
 map_data <- tidyhydat::allstations %>%
     left_join(range.df, by = "STATION_NUMBER") %>%
-    mutate(text = paste(sep = "<br/>", paste("<b>", STATION_NUMBER, "</b>"), 
-                        STATION_NAME, 
+    mutate(text = paste(sep = "<br/>", paste("<b>", STATION_NUMBER, "</b>"),
+                        STATION_NAME,
                         HYD_STATUS,
                         paste0("Flow Record: from ", Qfrom, " to ", Qto, " (", Qn, " Yrs)"),
                         paste0("Stage Record: from ", Hfrom, " to ", Hto, " (", Hn, " Yrs)")
@@ -53,16 +53,16 @@ map_data <- tidyhydat::allstations %>%
 # ------------ HYDAT data processing ------------
 # A function to wrangle the tidyhydat table into FlowScreen compatible format
 read.wsc.flows <- function(station_number) {
-    
+
     # read Qdaily from HYDAT
     Q_Daily = tidyhydat::hy_daily_flows(station_number = station_number, hydat_path = Hydat_Location)
-    
+
     # put the Qdaily into format readable by FlowScreen Package
-    wsc_input_df <- Q_Daily %>% 
+    wsc_input_df <- Q_Daily %>%
         # Flow parameter: 1 = Flow, 2 = level
-        mutate(ID = station_number, PARAM = 1, Agency = "WSC") %>% 
+        mutate(ID = station_number, PARAM = 1, Agency = "WSC") %>%
         select(ID, PARAM, Date, Flow = Value, SYM = Symbol, Agency)
-    
+
     return(wsc_input_df)
 } # EOF read.wsc.flows()
 
@@ -79,25 +79,27 @@ Dist_Key <- c("Qp.exp", "Qp.gam", "Qp.gev", "Qp.glo", "Qp.gno", "Qp.gpa",
 
 # ---------------- FFA FUNCTION ------------------
 lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
-    
-    
+
+
     # Custom output
-    if(evaluation == "Plot") (
-        ReturnPeriods  <- 1000:1
+    if(evaluation == TRUE) (
+        ReturnPeriods <- empirical.Tr
+    ) else if(evaluation == "Plot") (
+        ReturnPeriods  <- c(seq(1, 1.99, by = 0.01), seq(2, 9.9, by = 0.1), 10:1000)
     ) else (
         ReturnPeriods <- sort(empirical.Tr, decreasing = TRUE)
-    ) 
-    
+    )
+
     Pnonexc = 1 - (1/ReturnPeriods)
-    
+
     # samlmu() gets the sample L-moments, pelxxx() estimates the distribution's parameters from L-moments
     # Quaxxx generates quantile given probability and distribution parameters
     # xxx = "exp" "gam" "gev" "glo" "gno" "gpa" "gum" "kap" "ln3" "nor" "pe3" "wak" "wei"
-    
+
     lmoms <- samlmu(Qp, nmom = 5)
     log.lmoms <- samlmu(log10(Qp),nmom = 5)
-    
-    extremes <- tibble(ReturnPeriods = ReturnPeriods, 
+
+    extremes <- tibble(ReturnPeriods = ReturnPeriods,
                        Pnonexc = Pnonexc,
                        Qp.exp = quaexp(f = Pnonexc, para = pelexp(lmoms)), # exponential
                        Qp.gam = quagam(f = Pnonexc, para = pelgam(lmoms)), # gamma
@@ -111,19 +113,19 @@ lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
                        Qp.pe3 = quape3(f = Pnonexc, para = pelpe3(lmoms)), # pearson type III
                        Qp.wak = quawak(f = Pnonexc, para = pelwak(lmoms)), # wakeby
                        Qp.wei = quawei(f = Pnonexc, para = pelwei(lmoms)), # weibull
-                       
+
                        # Logged distribution from the package
                        Qp.ln3 = qualn3(f = Pnonexc, para = pelln3(lmoms)), # lognormal
-                       
+
                        # Manually created log distribution
                        Qp.LP3 = 10^quape3(f = Pnonexc, para = pelpe3(log.lmoms)) # log pearson type III
     )
-    
+
     if (evaluation == TRUE) {
         extremes <- extremes %>% mutate(Qp.obs = Qp) # observed Qp
-    } 
-    
-    return(extremes) 
+    }
+
+    return(extremes)
 } # End of Flood Frequency Function
 
 
@@ -132,16 +134,16 @@ lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
 
 # Define server logic
 shinyServer(function(input, output) {
-    
+
     # ----------- For the ReadMe HTML -----------
     # Directly using includeHTML in ui.R will break Shiny (stop execution of everything follows)
-    
+
     output$ReadMe_HTML <- renderUI({
         includeHTML("ReadMe.html")
-        
+
     })
-    
-    
+
+
     # Status if station is invalid
     output$status <- renderText({
         if (!(toupper(input$stn.id) %in% tidyhydat::allstations$STATION_NUMBER)) {
@@ -149,7 +151,7 @@ shinyServer(function(input, output) {
             } else {""}
     })
 
-    
+
     # Reactive statement to allow functions to run only if station is valid
     id.check <- reactive({
         # Make sure station is valid & output CAPITALIZED ID (always go through ID CHECK)
@@ -158,15 +160,15 @@ shinyServer(function(input, output) {
         toupper(input$stn.id)
     }) # EOF id.check()
 
-    
+
     # Station Name
     output$name <- renderText({
         printname <- tidyhydat::allstations %>% filter(STATION_NUMBER == id.check()) %>%
             select(STATION_NAME)
         printname[[1]]
     })
-    
-    
+
+
     # Station Dataset
     Dataset <- reactive({
         Q_Daily = tidyhydat::hy_daily_flows(station_number = id.check(), hydat_path = Hydat_Location)
@@ -179,69 +181,69 @@ shinyServer(function(input, output) {
         TS <- read.wsc.flows(station_number = id.check()) %>%
             mutate(Year = year(Date) , Month = month(Date), Day = day(Date)) %>%
             select(Date, Year, Month, Day, Flow, Symbol = SYM)
-        
+
         codes <- as.factor(TS$Symbol)
         codes <- match(codes, SYMs)
         codes <- SYMnames[codes]
-        
+
         TS <- mutate(TS, Flag = codes) %>% select(-Symbol)
-        
+
         if(input$Reso == "Daily"){
             TS$Flow <- round(TS$Flow, digits = 0)
         }
-        
+
         else if(input$Reso == "Monthly"){
             TS <- TS %>% group_by(Year, Month) %>%
                 summarise(Average_Flow = mean(Flow, na.rm = TRUE), Count = sum(is.na(Flow)==FALSE))
             TS$Average_Flow <- round(TS$Average_Flow, digits = 0)
         }
-        
+
         else if(input$Reso == "Yearly"){
             TS <- TS %>% group_by(Year) %>%
                 summarise(Average_Flow = mean(Flow, na.rm = TRUE), Max_Daily = max(Flow, na.rm = TRUE),
-                          Min_Daily = min(Flow, na.rm = TRUE), Count = sum(is.na(Flow) == FALSE)) %>% 
+                          Min_Daily = min(Flow, na.rm = TRUE), Count = sum(is.na(Flow) == FALSE)) %>%
                 round(digits = 0)
         }
         TS
     })
-    
+
     # ------------ Station Map Plotting ------------
     output$MapPlot <- renderLeaflet({
-        map_data %>% 
+        map_data %>%
             leaflet() %>%
             addTiles() %>%
             addMarkers(~LONGITUDE, ~LATITUDE, popup = ~text, clusterOptions = markerClusterOptions())
     })
 
-    
+
     # ------------ Data Table ----------------------
     output$table <- DT::renderDataTable({
-            
+
         Dataset_Summarize() %>% DT::datatable(
                 # Data table formatting options
                 extensions = c('Buttons', 'FixedColumns', 'Scroller'),
                 options = list(
-                    
+
                     # Options for extension "Buttons"
                     dom = 'Bfrtip',
-                    
+
                     buttons = list(I('colvis')),
-                    
+
                     columnDefs = list(list(className = "dt-center", targets = "_all")),
-                    
+
                     # Options for extension "FixedColumns"
                     scrollX = TRUE,
                     fixedColumns = TRUE,
-                    
+
                     # Options for extension "Scroller"
                     deferRender = TRUE,
                     scrollY = 600,
                     scroller = TRUE
                 )
         )
-        
+
     })
-    
+
     # ------------ Download Data Table ------------
     output$downloadSummary <- downloadHandler(
         filename = function() {
@@ -251,11 +253,11 @@ shinyServer(function(input, output) {
             write.csv(Dataset_Summarize(), file, row.names = FALSE)
         }
     )
-    
+
     # ------------ Time Series Graph (interactive) ------------
     ### Plot an interactive graph
     output$graph <- renderDygraph({
-    
+
         # Spread the flow data by the flag
         TS <- read.wsc.flows(station_number = id.check()) %>%
             select(Date, Flow, Symbol = SYM)
@@ -266,11 +268,11 @@ shinyServer(function(input, output) {
         number_flags <- length(unique(TS$Symbol))
         flag_names <- colnames(plot_data)[-1]
         flag_names <- replace(flag_names, flag_names == "<NA>", "No Code")
-        
+
         # Convert to an xts format required by the dygraphs package
         xts_Date <- as.POSIXct(plot_data$Date, format = "%Y-%m-%d")
         xts_Format <- as.xts(order.by = xts_Date, x = plot_data[,2])
-        
+
         # Combine flag columns, :(number_flags - 1)
         if(!number_flags == 1) {
             for (i in 1:(number_flags - 1)) {
@@ -281,46 +283,46 @@ shinyServer(function(input, output) {
             }
         }
         colnames(xts_Format) <- flag_names
-        
+
         y_axis <- "Discharge (m<sup>3</sup>/s)"
         dy_plots <- dygraph(xts_Format, ylab = y_axis) %>%
             dyLegend(width = 600) %>%
             dyRoller(rollPeriod = 1) %>%
             dyCrosshair(direction = "vertical") %>%
             dyRangeSelector()
-        
+
         # Plot the series if it exists
         #c("No Code", "Estimate", "Partial Day", "Ice Conditions", "Dry", "Revised")
         if(1 %in% match(flag_names, SYMnames)) {
             dy_plots <- dy_plots %>% dySeries("No Code", drawPoints = TRUE, color = "blue", fillGraph = TRUE)
         }
-        
+
         if(2 %in% match(flag_names, SYMnames)) {
             dy_plots <- dy_plots %>% dySeries("Estimate", drawPoints = TRUE, color = "#E41A1C", fillGraph = TRUE)
         }
-        
+
         if(3 %in% match(flag_names, SYMnames)) {
             dy_plots <- dy_plots %>% dySeries("Partial Day", drawPoints = TRUE, color = "#4DAF4A", fillGraph = TRUE)
         }
-        
+
         if(4 %in% match(flag_names, SYMnames)) {
             dy_plots <- dy_plots %>% dySeries("Ice Conditions", drawPoints = TRUE, color = "#377EB8", fillGraph = TRUE)
         }
-        
+
         if(5 %in% match(flag_names, SYMnames)) {
             dy_plots <- dy_plots %>% dySeries("Dry", drawPoints = TRUE, color = "#FF7F00")
         }
-        
+
         if(6 %in% match(flag_names, SYMnames)) {
             dy_plots <- dy_plots %>% dySeries("Revised", drawPoints = TRUE, color = "#984EA3")
         }
 
-        # call to plot    
+        # call to plot
         dy_plots
-            
+
     }) # End of interactive graph
-    
-    
+
+
     # Download Data button
     output$downloadData <- downloadHandler(
         filename = function() {
@@ -330,11 +332,11 @@ shinyServer(function(input, output) {
             write.csv(Dataset(), file, row.names = FALSE)
         }
     ) # End of csv file download
-    
+
     #id.check = function(){return("08FC003")}
-    
+
     # ------------ Frequency Analysis ------------
-    
+
     # Reactive statement to generate dataframes for FFA
     FFA <- reactive({
         complete.years <- read.wsc.flows(station_number = id.check()) %>%
@@ -344,7 +346,7 @@ shinyServer(function(input, output) {
             count(Year) %>%
             filter(!(n < 350)) %>% # discard station missing more than 10 days
             pull(Year)
-        
+
         empirical.ffa <- read.wsc.flows(station_number = id.check()) %>%
             filter(year(Date) %in% complete.years) %>%
             group_by(Year = year(Date)) %>%
@@ -354,29 +356,29 @@ shinyServer(function(input, output) {
                    Tr = ((length(Rank)+1) / Rank)
             ) %>%
             arrange(Rank)
-        
-        #GOF.input <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = empirical.ffa$Tr, evaluation = TRUE) 
-        
+
+        #GOF.input <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = empirical.ffa$Tr, evaluation = TRUE)
+
         #GOF.input %>% select(starts_with("Qp"), -ends_with("obs")) %>% names()
         #lm(Qp.obs ~ Qp.gam, data = GOF.input) %>% stats::AIC()
-        
+
         empirical.ffa
-        
+
     })
-    
+
     # ------------ FFA DataTable ------------
     output$ffa.table <- DT::renderDataTable({
-        
-        empirical.ffa <- FFA()    
+
+        empirical.ffa <- FFA()
         desired_columns <- Dist_Key[match(input$selector_dist, Dist_Options)]
 
         if (length(input$selector_Tr) < 1) (
             ffa_results <- lmom_Q(Qp = empirical.ffa$AMS) %>%
-                mutate_at(vars(-Pnonexc), funs(round(., 0))) %>%
-                mutate_at(vars(Pnonexc), funs(round(., 3))) %>%
+                mutate_at(vars(-Pnonexc), round(., 0)) %>%
+                mutate_at(vars(Pnonexc), round(., 3)) %>%
                 select(ReturnPeriods, Pnonexc, !!desired_columns) %>%
                 rename("Return Periods" = ReturnPeriods, "Probability Non-Exc" = Pnonexc)
-                
+
         ) else (
             ffa_results <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = as.integer(input$selector_Tr)) %>%
                 mutate_at(vars(-Pnonexc), funs(round(., 0))) %>%
@@ -384,44 +386,44 @@ shinyServer(function(input, output) {
                 select(ReturnPeriods, Pnonexc, !!desired_columns) %>%
                 rename("Return Periods" = ReturnPeriods, "Probability Non-Exc" = Pnonexc)
         )
-            
+
         ffa_results %>% DT::datatable(
             # Options for data table formatting
             extensions = c('Buttons', 'FixedColumns'),
             options = list(
-                
+
                 # Options for extension "Buttons"
                 dom = 'Bfrtip',
-                
+
                 buttons = list(I('colvis')),
-                
+
                 columnDefs = list(list(className = "dt-center", targets = "_all")),
-                
+
                 # Options for extension "FixedColumns"
                 scrollX = TRUE,
-                
+
                 # Options for extension "Scroller"
                 deferRender = TRUE,
                 scroller = TRUE
-                
+
             )
         )
     })
-    
+
     # ------------ FFA Plot ------------
     output$ffa.figure <- renderPlotly({
-        
+
         empirical.ffa <- FFA()
         desired_columns <- Dist_Key[match(input$selector_dist, Dist_Options)]
-        
+
         ffa_results <- lmom_Q(Qp = empirical.ffa$AMS, evaluation = "Plot") %>%
-            round(digits = 0) %>% select(-Pnonexc) %>%
+            select(-Pnonexc) %>%
             select(ReturnPeriods, !!desired_columns)
-            
+
         ffa_results <- gather(ffa_results, "Distribution", "Q", -1)
-        
+
         if (length(desired_columns) > 0) (
-            ffa_plot <- ggplot(ffa_results, aes(x = ReturnPeriods, y = Q, color = Distribution)) + 
+            ffa_plot <- ggplot(ffa_results, aes(x = ReturnPeriods, y = Q, color = Distribution)) +
                             geom_line() + theme_bw() +
                             scale_y_continuous(name = "Q (m3/s)", limits=c(0, NA)) +
                             geom_point(data = empirical.ffa, aes(x = Tr, y = AMS, colour = "Observed")) +
@@ -430,20 +432,20 @@ shinyServer(function(input, output) {
         )
         if (length(desired_columns) > 0) (ggplotly(ffa_plot))
     })
-    
-    
+
+
     # ------------ AMS Plot ------------
     output$max.figure <- renderPlotly({
-        
+
         empirical.ffa <- FFA()
-        max_plot <- ggplot(empirical.ffa, aes(x = Year, y = AMS)) + 
+        max_plot <- ggplot(empirical.ffa, aes(x = Year, y = AMS)) +
                         geom_point() + theme_bw() +
                         scale_y_continuous(name = "Q (m3/s)", limits=c(0, NA)) +
                         scale_x_continuous(name = "Year", limits=c(NA, NA)) +
                         ggtitle("Annual Daily Maximum Series")
-        
+
 
         ggplotly(max_plot)
     })
-    
+
 })
