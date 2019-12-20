@@ -35,7 +35,17 @@ Currently the app allows the user to:
 - View a hydrometric station historical daily hydrograph in an interactive graph  
 - Run a Flood Frequency Analysis on the annual daily maximum streamflow series using various distributions  
 
-Currently the app needs to be downloaded run on local computer using Shiny through RStudio with the Hydat database downloaded using tidyhydat
+Currently the app needs to be downloaded and run on local computer using Shiny through RStudio with the Hydat database downloaded through tidyhydat.
+<br/>
+
+To run the app you need to do the following:
+
+1) Install [R](https://cran.r-project.org/)
+2) Install [RStudio](https://rstudio.com/products/rstudio/download/) (just the free version)
+3) Install the required R Packages (see dependcies.R file for the list)
+4) Install the HYDAT Database using the tidyhydat function download_hydat()  
+
+3 and 4 can be alternatively completed by running the dependencies.R script
 <br/>
 
 ### Future updates
