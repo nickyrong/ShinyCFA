@@ -81,13 +81,13 @@ Dist_Key <- c("Qp.exp", "Qp.gam", "Qp.gev", "Qp.glo", "Qp.gno", "Qp.gpa",
 lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
 
 
-    # Custom output
+    # Custom output (let's keep the custom of having largest on top)
     if(evaluation == TRUE) (
-        ReturnPeriods <- empirical.Tr
+        ReturnPeriods <- empirical.Tr %>% sort(decreasing = TRUE)
     ) else if(evaluation == "Plot") (
-        ReturnPeriods  <- c(seq(1, 1.99, by = 0.01), seq(2, 9.9, by = 0.1), 10:1000)
+        ReturnPeriods  <- c(seq(1.01, 1.99, by = 0.01), seq(2, 9.9, by = 0.1), 10:1000) %>% sort(decreasing = TRUE)
     ) else (
-        ReturnPeriods <- sort(empirical.Tr, decreasing = TRUE)
+        ReturnPeriods <- empirical.Tr %>% sort(decreasing = TRUE)
     )
 
     Pnonexc = 1 - (1/ReturnPeriods)
