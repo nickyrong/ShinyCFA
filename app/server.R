@@ -355,10 +355,10 @@ shinyServer(function(input, output) {
             ) %>%
             arrange(Rank)
         
-        GOF.input <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = empirical.ffa$Tr, evaluation = TRUE) 
+        #GOF.input <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = empirical.ffa$Tr, evaluation = TRUE) 
         
-        GOF.input %>% select(starts_with("Qp"), -ends_with("obs")) %>% names()
-        lm(Qp.obs ~ Qp.gam, data = GOF.input) %>% stats::AIC()
+        #GOF.input %>% select(starts_with("Qp"), -ends_with("obs")) %>% names()
+        #lm(Qp.obs ~ Qp.gam, data = GOF.input) %>% stats::AIC()
         
         empirical.ffa
         
