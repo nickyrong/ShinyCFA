@@ -86,7 +86,7 @@ lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
     if(evaluation == TRUE) (
         ReturnPeriods <- empirical.Tr
     ) else if(evaluation == "Plot") (
-        ReturnPeriods  <- 1:1000
+        ReturnPeriods  <- c(seq(1, 1.99, by = 0.01), seq(2, 9.9, by = 0.1), 10:1000)
     ) else (
         if (is.na(empirical.Tr) == TRUE) (
             ReturnPeriods <- c(1.01, 2, 5, 10, 25, 50, 100, 200, 500, 1000)
@@ -379,8 +379,8 @@ shinyServer(function(input, output) {
 
         if (length(input$selector_Tr) < 1) (
             ffa_results <- lmom_Q(Qp = empirical.ffa$AMS) %>%
-                mutate_at(vars(-Pnonexc), funs(round(., 0))) %>%
-                mutate_at(vars(Pnonexc), funs(round(., 3))) %>%
+                mutate_at(vars(-Pnonexc), round(., 0)) %>%
+                mutate_at(vars(Pnonexc), round(., 3)) %>%
                 select(ReturnPeriods, Pnonexc, !!desired_columns) %>%
                 rename("Return Periods" = ReturnPeriods, "Probability Non-Exc" = Pnonexc)
                 
@@ -422,7 +422,7 @@ shinyServer(function(input, output) {
         desired_columns <- Dist_Key[match(input$selector_dist, Dist_Options)]
         
         ffa_results <- lmom_Q(Qp = empirical.ffa$AMS, evaluation = "Plot") %>%
-            round(digits = 0) %>% select(-Pnonexc) %>%
+            select(-Pnonexc) %>%
             select(ReturnPeriods, !!desired_columns)
             
         ffa_results <- gather(ffa_results, "Distribution", "Q", -1)
