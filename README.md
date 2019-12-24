@@ -6,6 +6,14 @@ output:
 
 
 <br/>
+
+<script>
+   $(document).ready(function() {
+     $head = $('#header');
+     $head.prepend('<img src=\"https://www.knightpiesold.com/en/includes/themes/kpCustom/images/KP-logo.png\" style=\"float: right;width: 180px;\"/>')
+   });
+</script><br/>
+
 **Authors:** <br/>
 Nick Rong (Junior Scientist at *Knight Piesold Consulting*) <br/>
 Nate Smith (Senior Engineer at *Knight Piesold Consulting*) <br/><br/>
@@ -19,8 +27,13 @@ This app allows the user to enter a station ID to access the Hydat database:
 [Hydat Database](https://www.canada.ca/en/environment-climate-change/services/water-overview/quantity/monitoring/survey/data-products-services/national-archive-hydat.html)
 <br/>
 
+
+
 Functionality in this ShinyApp is provided by [tidyhydat package](https://github.com/ropensci/tidyhydat). 
 <br/>
+<img src="https://github.com/ropensci/tidyhydat/raw/master/man/figures/tidyhydat.png" width="10%" />
+<br/>
+
 
 
 ### Usage:
