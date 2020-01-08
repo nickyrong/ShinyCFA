@@ -139,7 +139,7 @@ shinyServer(function(input, output) {
     # Directly using includeHTML in ui.R will break Shiny (stop execution of everything follows)
 
     output$ReadMe_HTML <- renderUI({
-        includeHTML("ReadMe.html")
+        includeHTML("./ReadMe.html")
 
     })
 
