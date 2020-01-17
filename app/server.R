@@ -10,6 +10,7 @@ library(dygraphs)
 library(tidyverse)
 library(lmom)
 library(plotly)
+library(rlang)
 
 
 # ------------ HYDAT database loading ------------
@@ -98,27 +99,28 @@ lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
 
     lmoms <- samlmu(Qp, nmom = 5)
     log.lmoms <- samlmu(log10(Qp),nmom = 5)
-
+    
+    error_value <- rep(1, length(Pnonexc))
     extremes <- tibble(ReturnPeriods = ReturnPeriods,
                        Pnonexc = Pnonexc,
-                       Qp.exp = quaexp(f = Pnonexc, para = pelexp(lmoms)), # exponential
-                       Qp.gam = quagam(f = Pnonexc, para = pelgam(lmoms)), # gamma
-                       Qp.gev = quagev(f = Pnonexc, para = pelgev(lmoms)), # generalized extreme-value
-                       Qp.glo = quaglo(f = Pnonexc, para = pelglo(lmoms)), # generalized logistic
-                       Qp.gno = quagno(f = Pnonexc, para = pelgno(lmoms)), # generalized normal
-                       Qp.gpa = quagpa(f = Pnonexc, para = pelgpa(lmoms)), # generalized pareto
-                       Qp.gum = quagum(f = Pnonexc, para = pelgum(lmoms)), # gumbel (extreme value type I)
-                       Qp.kap = quakap(f = Pnonexc, para = pelkap(lmoms)), # kappa
-                       Qp.nor = quanor(f = Pnonexc, para = pelnor(lmoms)), # normal
-                       Qp.pe3 = quape3(f = Pnonexc, para = pelpe3(lmoms)), # pearson type III
-                       Qp.wak = quawak(f = Pnonexc, para = pelwak(lmoms)), # wakeby
-                       Qp.wei = quawei(f = Pnonexc, para = pelwei(lmoms)), # weibull
+                       Qp.exp = tryCatch(error = function(cnd) {error_value}, quaexp(f = Pnonexc, para = pelexp(lmoms))), # exponential
+                       Qp.gam = tryCatch(error = function(cnd) {error_value}, quagam(f = Pnonexc, para = pelgam(lmoms))), # gamma
+                       Qp.gev = tryCatch(error = function(cnd) {error_value}, quagev(f = Pnonexc, para = pelgev(lmoms))), # generalized extreme-value
+                       Qp.glo = tryCatch(error = function(cnd) {error_value}, quaglo(f = Pnonexc, para = pelglo(lmoms))), # generalized logistic
+                       Qp.gno = tryCatch(error = function(cnd) {error_value}, quagno(f = Pnonexc, para = pelgno(lmoms))), # generalized normal
+                       Qp.gpa = tryCatch(error = function(cnd) {error_value}, quagpa(f = Pnonexc, para = pelgpa(lmoms))), # generalized pareto
+                       Qp.gum = tryCatch(error = function(cnd) {error_value}, quagum(f = Pnonexc, para = pelgum(lmoms))), # gumbel (extreme value type I)
+                       Qp.kap = tryCatch(error = function(cnd) {error_value}, quakap(f = Pnonexc, para = pelkap(lmoms))), # kappa
+                       Qp.nor = tryCatch(error = function(cnd) {error_value}, quanor(f = Pnonexc, para = pelnor(lmoms))), # normal
+                       Qp.pe3 = tryCatch(error = function(cnd) {error_value}, quape3(f = Pnonexc, para = pelpe3(lmoms))), # pearson type III
+                       Qp.wak = tryCatch(error = function(cnd) {error_value}, quawak(f = Pnonexc, para = pelwak(lmoms))), # wakeby
+                       Qp.wei = tryCatch(error = function(cnd) {error_value}, quawei(f = Pnonexc, para = pelwei(lmoms))), # weibull
 
                        # Logged distribution from the package
-                       Qp.ln3 = qualn3(f = Pnonexc, para = pelln3(lmoms)), # lognormal
+                       Qp.ln3 = tryCatch(error = function(cnd) {error_value}, qualn3(f = Pnonexc, para = pelln3(lmoms))), # lognormal
 
                        # Manually created log distribution
-                       Qp.LP3 = 10^quape3(f = Pnonexc, para = pelpe3(log.lmoms)) # log pearson type III
+                       Qp.LP3 = tryCatch(error = function(cnd) {error_value}, 10^quape3(f = Pnonexc, para = pelpe3(log.lmoms))) # log pearson type III
     )
 
     if (evaluation == TRUE) {
