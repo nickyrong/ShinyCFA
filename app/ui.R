@@ -7,7 +7,7 @@ library(plotly)
 # Lists
 Dist_Options <- c("Exponential", "Gamma", "GEV", "Gen. Logistic", "Gen. Normal", "Gen. Pareto",
                   "Gumbel", "Kappa", "Normal", "Pearson III", "Wakeby", "Weibull", "Log-Normal", "LP3")
-Tr_Options <- c(1.01, 2, 5, 10, 20, 25, 30, 40, 50, 75, 100, 200, 250, 300,
+Tr_Options <- c(2, 5, 10, 20, 25, 30, 40, 50, 75, 100, 200, 250, 300,
                 400, 500, 1000, 2500, 10000)
 
 
@@ -71,6 +71,10 @@ shinyUI(fluidPage(
                     selectizeInput('selector_Tr', 'Select Return Periods (Years)',
                                    choices = Tr_Options, multiple = TRUE,
                                    options = list(maxItems = 10), selected = 200),
+                    sliderInput('selector_days', 'Complete Days/Year',
+                                   min = 0, max = 365, value = 355),
+                    textOutput("FFA_complete_years"),
+                    br(),
                     DT::dataTableOutput("ffa.table"),
                     br(), br(),
                     plotlyOutput("ffa.figure"),
