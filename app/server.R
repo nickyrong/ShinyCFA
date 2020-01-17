@@ -10,6 +10,7 @@ library(dygraphs)
 library(tidyverse)
 library(lmom)
 library(plotly)
+library(rlang)
 
 
 # ------------ HYDAT database loading ------------
@@ -98,27 +99,28 @@ lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
 
     lmoms <- samlmu(Qp, nmom = 5)
     log.lmoms <- samlmu(log10(Qp),nmom = 5)
-
+    
+    error_value <- as.numeric(rep(NA, length(Pnonexc)))
     extremes <- tibble(ReturnPeriods = ReturnPeriods,
                        Pnonexc = Pnonexc,
-                       Qp.exp = quaexp(f = Pnonexc, para = pelexp(lmoms)), # exponential
-                       Qp.gam = quagam(f = Pnonexc, para = pelgam(lmoms)), # gamma
-                       Qp.gev = quagev(f = Pnonexc, para = pelgev(lmoms)), # generalized extreme-value
-                       Qp.glo = quaglo(f = Pnonexc, para = pelglo(lmoms)), # generalized logistic
-                       Qp.gno = quagno(f = Pnonexc, para = pelgno(lmoms)), # generalized normal
-                       Qp.gpa = quagpa(f = Pnonexc, para = pelgpa(lmoms)), # generalized pareto
-                       Qp.gum = quagum(f = Pnonexc, para = pelgum(lmoms)), # gumbel (extreme value type I)
-                       Qp.kap = quakap(f = Pnonexc, para = pelkap(lmoms)), # kappa
-                       Qp.nor = quanor(f = Pnonexc, para = pelnor(lmoms)), # normal
-                       Qp.pe3 = quape3(f = Pnonexc, para = pelpe3(lmoms)), # pearson type III
-                       Qp.wak = quawak(f = Pnonexc, para = pelwak(lmoms)), # wakeby
-                       Qp.wei = quawei(f = Pnonexc, para = pelwei(lmoms)), # weibull
+                       Qp.exp = tryCatch(error = function(err) {return(error_value)}, quaexp(f = Pnonexc, para = pelexp(lmoms))), # exponential
+                       Qp.gam = tryCatch(error = function(err) {return(error_value)}, quagam(f = Pnonexc, para = pelgam(lmoms))), # gamma
+                       Qp.gev = tryCatch(error = function(err) {return(error_value)}, quagev(f = Pnonexc, para = pelgev(lmoms))), # generalized extreme-value
+                       Qp.glo = tryCatch(error = function(err) {return(error_value)}, quaglo(f = Pnonexc, para = pelglo(lmoms))), # generalized logistic
+                       Qp.gno = tryCatch(error = function(err) {return(error_value)}, quagno(f = Pnonexc, para = pelgno(lmoms))), # generalized normal
+                       Qp.gpa = tryCatch(error = function(err) {return(error_value)}, quagpa(f = Pnonexc, para = pelgpa(lmoms))), # generalized pareto
+                       Qp.gum = tryCatch(error = function(err) {return(error_value)}, quagum(f = Pnonexc, para = pelgum(lmoms))), # gumbel (extreme value type I)
+                       Qp.kap = tryCatch(error = function(err) {return(error_value)}, quakap(f = Pnonexc, para = pelkap(lmoms))), # kappa
+                       Qp.nor = tryCatch(error = function(err) {return(error_value)}, quanor(f = Pnonexc, para = pelnor(lmoms))), # normal
+                       Qp.pe3 = tryCatch(error = function(err) {return(error_value)}, quape3(f = Pnonexc, para = pelpe3(lmoms))), # pearson type III
+                       Qp.wak = tryCatch(error = function(err) {return(error_value)}, quawak(f = Pnonexc, para = pelwak(lmoms))), # wakeby
+                       Qp.wei = tryCatch(error = function(err) {return(error_value)}, quawei(f = Pnonexc, para = pelwei(lmoms))), # weibull
 
                        # Logged distribution from the package
-                       Qp.ln3 = qualn3(f = Pnonexc, para = pelln3(lmoms)), # lognormal
+                       Qp.ln3 = tryCatch(error = function(err) {return(error_value)}, qualn3(f = Pnonexc, para = pelln3(lmoms))), # lognormal
 
                        # Manually created log distribution
-                       Qp.LP3 = 10^quape3(f = Pnonexc, para = pelpe3(log.lmoms)) # log pearson type III
+                       Qp.LP3 = tryCatch(error = function(err) {return(error_value)}, 10^quape3(f = Pnonexc, para = pelpe3(log.lmoms))) # log pearson type III
     )
 
     if (evaluation == TRUE) {
@@ -176,7 +178,7 @@ shinyServer(function(input, output) {
     })
 
     # Station Dataset Summarized
-    # Uses user input from the resoluction dropdown
+    # Uses user input from the resolution dropdown
     Dataset_Summarize <- reactive({
         TS <- read.wsc.flows(station_number = id.check()) %>%
             mutate(Year = year(Date) , Month = month(Date), Day = day(Date)) %>%
@@ -344,11 +346,12 @@ shinyServer(function(input, output) {
             drop_na(Flow) %>%
             group_by(Year) %>%
             count(Year) %>%
-            filter(!(n < 350)) %>% # discard station missing more than 10 days
+            filter(n >= input$selector_days) %>% # discard incomplete years based on day selection
             pull(Year)
 
         empirical.ffa <- read.wsc.flows(station_number = id.check()) %>%
             filter(year(Date) %in% complete.years) %>%
+            drop_na(Flow) %>%
             group_by(Year = year(Date)) %>%
             summarize(AMS = max(Flow)) %>%
             ungroup() %>%
@@ -365,11 +368,26 @@ shinyServer(function(input, output) {
         empirical.ffa
 
     })
+    
+    # Output number of complete years for FFA
+    output$FFA_complete_years <- renderText({ 
+        if(nrow(FFA()) > 1) (
+            paste("Complete Years:", nrow(FFA()))
+        ) else (
+            paste("Complete Years:", nrow(FFA()), "(Insufficient Years)")
+        )
+    })
+    
+    # Reactive statement to allow FFA to run only if number of years is > 1
+    FFA.Allow <- reactive({
+        req(nrow(FFA()) > 1)
+        FFA()
+    })
 
     # ------------ FFA DataTable ------------
     output$ffa.table <- DT::renderDataTable({
 
-        empirical.ffa <- FFA()
+        empirical.ffa <- FFA.Allow()
         desired_columns <- Dist_Key[match(input$selector_dist, Dist_Options)]
 
         if (length(input$selector_Tr) < 1) (
@@ -391,21 +409,21 @@ shinyServer(function(input, output) {
             # Options for data table formatting
             extensions = c('Buttons', 'FixedColumns'),
             options = list(
-
+    
                 # Options for extension "Buttons"
                 dom = 'Bfrtip',
-
+    
                 buttons = list(I('colvis')),
-
+    
                 columnDefs = list(list(className = "dt-center", targets = "_all")),
-
+    
                 # Options for extension "FixedColumns"
                 scrollX = TRUE,
-
+    
                 # Options for extension "Scroller"
                 deferRender = TRUE,
                 scroller = TRUE
-
+    
             )
         )
     })
@@ -413,15 +431,15 @@ shinyServer(function(input, output) {
     # ------------ FFA Plot ------------
     output$ffa.figure <- renderPlotly({
 
-        empirical.ffa <- FFA()
+        empirical.ffa <- FFA.Allow()
         desired_columns <- Dist_Key[match(input$selector_dist, Dist_Options)]
-
+        
         ffa_results <- lmom_Q(Qp = empirical.ffa$AMS, evaluation = "Plot") %>%
             select(-Pnonexc) %>%
             select(ReturnPeriods, !!desired_columns)
-
+    
         ffa_results <- gather(ffa_results, "Distribution", "Q", -1)
-
+    
         if (length(desired_columns) > 0) (
             ffa_plot <- ggplot(ffa_results, aes(x = ReturnPeriods, y = Q, color = Distribution)) +
                             geom_line() + theme_bw() +
@@ -430,6 +448,7 @@ shinyServer(function(input, output) {
                             scale_x_log10(name = "Annual Return Periods") +
                             ggtitle("Flood Frequency Analysis")
         )
+        
         if (length(desired_columns) > 0) (ggplotly(ffa_plot))
     })
 

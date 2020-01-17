@@ -10,11 +10,12 @@ library(dygraphs)
 library(tidyr)
 
 # Determine Hydat database location
-if(file.exists ("./Database/Hydat.sqlite3")){
-    Hydat_Location <- ".\\Database/Hydat.sqlite3"
+if(file.exists ("./database/Hydat.sqlite3")){
+    Hydat_Location <- "./database/Hydat.sqlite3"
 } else {
     Hydat_Location <- tidyhydat::hy_default_db()
-    }
+}
+
 
 # Generate the data for the map by calling coordinates, labels, and date ranges from the HYDAT database
 range.df <-  tidyhydat::hy_stn_data_range(hydat_path = Hydat_Location) %>% 
@@ -114,21 +115,22 @@ shinyServer(function(input, output) {
             TS <- mutate(TS, Flag = codes) %>% select(-Symbol)
 
             if(input$Reso == "Daily"){
-                TS$Flow <- round(TS$Flow, digits = 0)
+                TS$Flow <- round(TS$Flow, digits = 1)
                 TS
             }
 
             else if(input$Reso == "Monthly"){
                 TS <- TS %>% group_by(Year, Month) %>%
-                    summarise(Average_Flow = mean(Flow, na.rm = TRUE), Count = sum(is.na(Flow)==FALSE))
-                TS$Average_Flow <- round(TS$Average_Flow, digits = 0)
+                    summarise(Average_Flow = round(mean(Flow, na.rm = TRUE), digits = 1), 
+                              Count = sum(is.na(Flow)==FALSE))
                 TS
             }
             else if(input$Reso == "Yearly"){
                 TS <- TS %>% group_by(Year) %>%
-                    summarise(Average_Flow = mean(Flow, na.rm = TRUE), Max_Daily = max(Flow, na.rm = TRUE),
-                              Min_Daily = min(Flow, na.rm = TRUE), Count = sum(is.na(Flow)==FALSE))
-                TS <- round(select(TS, -Year), digits = 0)
+                    summarise(Average_Flow = round(mean(Flow, na.rm = TRUE), digits = 1), 
+                              Max_Daily = round(max(Flow, na.rm = TRUE), digits = 1),
+                              Min_Daily = round(min(Flow, na.rm = TRUE), digits = 1), 
+                              Count = sum(is.na(Flow)==FALSE))
                 TS
             }
         })
