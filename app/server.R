@@ -335,12 +335,10 @@ shinyServer(function(input, output) {
         }
     ) # End of csv file download
 
-    #id.check = function(){return("08FC003")}
-
     # ------------ Frequency Analysis ------------
 
     # Reactive statement to generate dataframes for FFA
-    FFA <- reactive({
+    FFA_Years <- reactive({
         complete.years <- read.wsc.flows(station_number = id.check()) %>%
             mutate(Year = year(Date)) %>%
             drop_na(Flow) %>%
@@ -348,9 +346,16 @@ shinyServer(function(input, output) {
             count(Year) %>%
             filter(n >= input$selector_days) %>% # discard incomplete years based on day selection
             pull(Year)
-
+        
+        complete.years
+    })
+    
+    # Subset FFA based on selection
+    FFA <- reactive({
+        complete.years <- FFA_Years()
         empirical.ffa <- read.wsc.flows(station_number = id.check()) %>%
             filter(year(Date) %in% complete.years) %>%
+            filter(month(Date) >= input$selector_months[1] & month(Date) <= input$selector_months[2]) %>%
             drop_na(Flow) %>%
             group_by(Year = year(Date)) %>%
             summarize(AMS = max(Flow)) %>%
@@ -359,14 +364,8 @@ shinyServer(function(input, output) {
                    Tr = ((length(Rank)+1) / Rank)
             ) %>%
             arrange(Rank)
-
-        #GOF.input <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = empirical.ffa$Tr, evaluation = TRUE)
-
-        #GOF.input %>% select(starts_with("Qp"), -ends_with("obs")) %>% names()
-        #lm(Qp.obs ~ Qp.gam, data = GOF.input) %>% stats::AIC()
-
+        
         empirical.ffa
-
     })
     
     # Output number of complete years for FFA
@@ -375,6 +374,37 @@ shinyServer(function(input, output) {
             paste("Complete Years:", nrow(FFA()))
         ) else (
             paste("Complete Years:", nrow(FFA()), "(Insufficient Years)")
+        )
+    })
+    
+    # AMS DataTable
+    output$AMS.table <- DT::renderDataTable({
+        empirical.ffa <- FFA.Allow()
+        
+        empirical.ffa <- empirical.ffa %>%
+            mutate(Return_Period = round(Tr, 1)) %>%
+            select(-Tr)
+        
+        empirical.ffa %>% DT::datatable(
+            # Options for data table formatting
+            extensions = c('Buttons', 'FixedColumns'),
+            options = list(
+                
+                # Options for extension "Buttons"
+                dom = 'Bfrtip',
+                
+                buttons = list(I('colvis')),
+                
+                columnDefs = list(list(className = "dt-center", targets = "_all")),
+                
+                # Options for extension "FixedColumns"
+                scrollX = TRUE,
+                
+                # Options for extension "Scroller"
+                deferRender = TRUE,
+                scroller = TRUE
+                
+            )
         )
     })
     
@@ -456,7 +486,7 @@ shinyServer(function(input, output) {
     # ------------ AMS Plot ------------
     output$max.figure <- renderPlotly({
 
-        empirical.ffa <- FFA()
+        empirical.ffa <- FFA.Allow()
         max_plot <- ggplot(empirical.ffa, aes(x = Year, y = AMS)) +
                         geom_point() + theme_bw() +
                         scale_y_continuous(name = "Q (m3/s)", limits=c(0, NA)) +
