@@ -66,21 +66,30 @@ shinyUI(fluidPage(
 
                 tabPanel("Frequency Analysis",
                     br(),
-                    selectizeInput('selector_dist', 'Select Distributions',
-                                   choices = Dist_Options, multiple = TRUE),
-                    selectizeInput('selector_Tr', 'Select Return Periods (Years)',
-                                   choices = Tr_Options, multiple = TRUE,
-                                   options = list(maxItems = 10), selected = 200),
-                    sliderInput('selector_days', 'Complete Days/Year',
-                                   min = 0, max = 365, value = 355),
+                    fluidRow(
+                        column(6,
+                                selectizeInput('selector_dist', 'Select Distributions',
+                                                choices = Dist_Options, multiple = TRUE)),
+                        column(6,    
+                                selectizeInput('selector_Tr', 'Select Return Periods (Years)',
+                                                choices = Tr_Options, multiple = TRUE,
+                                                options = list(maxItems = 10), selected = 200))),
+                    fluidRow(
+                        column(6,
+                                sliderInput('selector_days', 'Complete Days/Year',
+                                            min = 0, max = 365, value = 355)),
+                        column(6,
+                                sliderInput('selector_months', 'Month Range Selection',
+                                            min = 1, max = 12, value = c(1,12)))),
                     textOutput("FFA_complete_years"),
                     br(),
+                    DT::dataTableOutput("AMS.table"),
+                    br(),
+                    plotlyOutput("max.figure"),
+                    br(),
                     DT::dataTableOutput("ffa.table"),
-                    br(), br(),
-                    plotlyOutput("ffa.figure"),
-                    br(), br(),
-                    plotlyOutput("max.figure")
-
+                    br(),
+                    plotlyOutput("ffa.figure")
                 )
 
             ) # End of tabsetPanel
