@@ -101,6 +101,7 @@ lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
     log.lmoms <- samlmu(log10(Qp),nmom = 5)
     
     error_value <- as.numeric(rep(NA, length(Pnonexc)))
+    # using tryCatch to allow the app to continue running if a particular distibution can't be fit to the data
     extremes <- tibble(ReturnPeriods = ReturnPeriods,
                        Pnonexc = Pnonexc,
                        Qp.exp = tryCatch(error = function(err) {return(error_value)}, quaexp(f = Pnonexc, para = pelexp(lmoms))), # exponential
@@ -337,7 +338,7 @@ shinyServer(function(input, output) {
 
     # ------------ Frequency Analysis ------------
 
-    # Reactive statement to generate dataframes for FFA
+    # Reactive statement to generate complete years for the FFA
     FFA_Years <- reactive({
         complete.years <- read.wsc.flows(station_number = id.check()) %>%
             mutate(Year = year(Date)) %>%
@@ -350,15 +351,22 @@ shinyServer(function(input, output) {
         complete.years
     })
     
+    # Output years for year removal selector in the ui
+    output$year_list <- renderUI({
+        selectizeInput('selector_years', 'Remove Years',
+                       choices = FFA_Years(), multiple = TRUE)
+    })
+    
     # Subset FFA based on selection
     FFA <- reactive({
         complete.years <- FFA_Years()
         empirical.ffa <- read.wsc.flows(station_number = id.check()) %>%
-            filter(year(Date) %in% complete.years) %>%
-            filter(month(Date) >= input$selector_months[1] & month(Date) <= input$selector_months[2]) %>%
+            filter(year(Date) %in% complete.years) %>% #only include complete years
+            filter(month(Date) >= input$selector_months[1] & month(Date) <= input$selector_months[2]) %>% #subset based on month selection
             drop_na(Flow) %>%
             group_by(Year = year(Date)) %>%
             summarize(AMS = max(Flow)) %>%
+            filter(!Year %in% input$selector_years) %>% #remove years the user has selected for removal
             ungroup() %>%
             mutate(Rank = base::rank(-AMS, ties.method = "random"),
                    Tr = ((length(Rank)+1) / Rank)
@@ -376,6 +384,7 @@ shinyServer(function(input, output) {
             paste("Complete Years:", nrow(FFA()), "(Insufficient Years)")
         )
     })
+    
     
     # AMS DataTable
     output$AMS.table <- DT::renderDataTable({
