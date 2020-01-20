@@ -1,15 +1,6 @@
 
 <br/>
 
-<script>
-   $(document).ready(function() {
-     $head = $('#header');
-     $head.prepend('<img src=\"https://www.knightpiesold.com/en/includes/themes/kpCustom/images/KP-logo.png\" style=\"float: right;width: 180px;\"/>')
-   });
-</script>
-
-<br/>
-
 **Authors:** <br/> Nick Rong (Junior Scientist at *Knight Piesold
 Consulting*) <br/> Nate Smith (Senior Engineer at *Knight Piesold
 Consulting*) <br/><br/> Last Update 12/19/2019 <br/> Last Change: Added
