@@ -396,9 +396,10 @@ shinyServer(function(input, output) {
                 filter(month(Date) >= input$selector_months[1] & month(Date) <= input$selector_months[2]) %>% #subset based on month selection
                 drop_na(Flow) %>%
                 group_by(Year = year(Date)) %>%
-                summarize(AMS = max(Flow)) %>%
-                filter(!Year %in% input$selector_years) %>% #remove years the user has selected for removal
+                filter(Flow == max(Flow)) %>%
+                rename(AMS = Flow) %>%
                 ungroup() %>%
+                filter(!Year %in% input$selector_years) %>% #remove years the user has selected for removal
                 mutate(Rank = base::rank(-AMS, ties.method = "random"),
                        Tr = ((length(Rank)+1) / Rank)
                 ) %>%
@@ -411,9 +412,10 @@ shinyServer(function(input, output) {
                 # Cannot subset by months
                 drop_na(Flow) %>%
                 group_by(Year = year(Date)) %>%
-                summarize(AMS = max(Flow)) %>%
-                filter(!Year %in% input$selector_years) %>% #remove years the user has selected for removal
+                filter(Flow == max(Flow)) %>%
+                rename(AMS = Flow) %>%
                 ungroup() %>%
+                filter(!Year %in% input$selector_years) %>% #remove years the user has selected for removal
                 mutate(Rank = base::rank(-AMS, ties.method = "random"),
                        Tr = ((length(Rank)+1) / Rank)
                 ) %>%
@@ -440,7 +442,7 @@ shinyServer(function(input, output) {
 
         empirical.ffa <- empirical.ffa %>%
             mutate(Return_Period = round(Tr, 1)) %>%
-            select(-Tr)
+            select(ID, Year, Date, AMS, Rank, Return_Period, SYM)
 
         empirical.ffa %>% DT::datatable(
             # Options for data table formatting
@@ -529,29 +531,17 @@ shinyServer(function(input, output) {
 
         if (length(desired_columns) > 0) (
                 
-                if(input$Qtype == "Qdaily") {
-                    
-                    ffa_plot <- ggplot(ffa_results, aes(x = ReturnPeriods, y = Q, color = Distribution)) +
-                        geom_line() + theme_bw() +
-                        geom_point(data = empirical.ffa, aes(x = Tr, y = AMS, colour = "Observed")) +
-                        scale_x_log10(name = "Annual Return Periods") +
-                        ggtitle("Qdaily Flood Frequency Analysis") + 
-                        
-                        scale_y_continuous(name = 'Q Daily (m3/s)', limits=c(0, NA))
-                        
-                } else if(input$Qtype == "Qinst") {
-                    
-                    ffa_plot <- ggplot(ffa_results, aes(x = ReturnPeriods, y = Q, color = Distribution)) +
-                        geom_line() + theme_bw() +
-                        geom_point(data = empirical.ffa, aes(x = Tr, y = AMS, colour = "Observed"), alpha = 0.6) +
-                        scale_x_log10(name = "Annual Return Periods") +
-                        ggtitle("Q Instantaneous Flood Frequency Analysis") +
-                    
-                        scale_y_continuous(name = 'Q Inst (m3/s)', limits=c(0, NA))
-                }
-            
-            
-            
+            ffa_plot <- ggplot(ffa_results, aes(x = ReturnPeriods, y = Q, color = Distribution)) +
+                geom_line() + theme_bw() +
+                geom_point(data = empirical.ffa, aes(x = Tr, y = AMS, colour = "Observed")) +
+                scale_x_log10(name = "Annual Return Periods") +
+                ggtitle("Qdaily Flood Frequency Analysis") + 
+                
+                {if(input$Qtype == "Qdaily") scale_y_continuous(name = 'Q Daily (m3/s)', limits=c(0, NA))} + 
+                {if(input$Qtype == "Qdaily") ggtitle("Qdaily Flood Frequency Analysis")} +
+                
+                {if(input$Qtype == "Qinst") scale_y_continuous(name = 'Q Inst (m3/s)', limits=c(0, NA))} + 
+                {if(input$Qtype == "Qinst") ggtitle("Q Instantaneous Flood Frequency Analysis")}
 
         )
 
@@ -567,8 +557,8 @@ shinyServer(function(input, output) {
                         geom_point() + theme_bw() +
                         scale_y_continuous(name = "Q (m3/s)", limits=c(0, NA)) +
                         scale_x_continuous(name = "Year", limits=c(NA, NA)) +
-                        ggtitle("Annual Daily Maximum Series")
-
+                        {if(input$Qtype == "Qdaily") ggtitle("Annual Daily Maximum Series")} +
+                        {if(input$Qtype == "Qinst") ggtitle("Annual Instantaneous Maximum Series")}
 
         ggplotly(max_plot)
     })
