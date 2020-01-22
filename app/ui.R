@@ -37,7 +37,7 @@ shinyUI(fluidPage(
                          br(),
                          h3("Database is still loading if map is not visible"),
                          br(),
-                         leafletOutput("MapPlot"),
+                         leafletOutput("MapPlot", height = 800),
                          "Zoom into map to see station locations",
                          br(),
                          "Click on a location to see Station ID, Station Name, and Status: active/discontinued"

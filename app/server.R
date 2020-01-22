@@ -283,7 +283,7 @@ shinyServer(function(input, output) {
     output$graph <- renderDygraph({
 
         # Spread the flow data by the flag
-        TS <- read.wsc.flows(station_number = id.check(), type = input$Qtype) %>%
+        TS <- read.wsc.flows(station_number = id.check(), type = "Qdaily") %>%
             select(Date, Flow, Symbol = SYM)
         codes <- as.factor(TS$Symbol)
         codes <- match(codes, SYMs)
@@ -384,6 +384,9 @@ shinyServer(function(input, output) {
 
     # Subset FFA based on selection
     FFA <- reactive({
+        
+        req(input$Qtype)
+        
         complete.years <- FFA_Years()
         
         if(input$Qtype == "Qdaily") {
@@ -525,19 +528,26 @@ shinyServer(function(input, output) {
         ffa_results <- gather(ffa_results, "Distribution", "Q", -1)
 
         if (length(desired_columns) > 0) (
-            
-            ffa_plot <- ggplot(ffa_results, aes(x = ReturnPeriods, y = Q, color = Distribution)) +
-                            geom_line() + theme_bw() +
-                            geom_point(data = empirical.ffa, aes(x = Tr, y = AMS, colour = "Observed")) +
-                            scale_x_log10(name = "Annual Return Periods") +
-                            ggtitle("Flood Frequency Analysis") + 
                 
                 if(input$Qtype == "Qdaily") {
-                    ffa_plot <- ffa_plot + scale_y_continuous(name = 'Q Daily~(m^3/s)', limits=c(0, NA))
-                } +
-                
-                if(input$Qtype == "Qinst") {
-                    ffa_plot <- ffa_plot + scale_y_continuous(name = 'Q Instantaneous (m^3/s)', limits=c(0, NA))
+                    
+                    ffa_plot <- ggplot(ffa_results, aes(x = ReturnPeriods, y = Q, color = Distribution)) +
+                        geom_line() + theme_bw() +
+                        geom_point(data = empirical.ffa, aes(x = Tr, y = AMS, colour = "Observed")) +
+                        scale_x_log10(name = "Annual Return Periods") +
+                        ggtitle("Qdaily Flood Frequency Analysis") + 
+                        
+                        scale_y_continuous(name = 'Q Daily (m3/s)', limits=c(0, NA))
+                        
+                } else if(input$Qtype == "Qinst") {
+                    
+                    ffa_plot <- ggplot(ffa_results, aes(x = ReturnPeriods, y = Q, color = Distribution)) +
+                        geom_line() + theme_bw() +
+                        geom_point(data = empirical.ffa, aes(x = Tr, y = AMS, colour = "Observed"), alpha = 0.6) +
+                        scale_x_log10(name = "Annual Return Periods") +
+                        ggtitle("Q Instantaneous Flood Frequency Analysis") +
+                    
+                        scale_y_continuous(name = 'Q Inst (m3/s)', limits=c(0, NA))
                 }
             
             
@@ -545,7 +555,7 @@ shinyServer(function(input, output) {
 
         )
 
-        if (length(desired_columns) > 0) (ggplotly(ffa_plot))
+        if (length(desired_columns) > 0) (ggplotly(ffa_plot, height = 800, width = 1280))
     })
 
 
