@@ -1,6 +1,6 @@
 ---
 output: 
-  github_document
+  html_document
 ---
 
 ```{r echo = FALSE, include=FALSE}
@@ -19,7 +19,7 @@ knitr::opts_chunk$set(echo = FALSE)
 **Authors:** <br/>
 Nick Rong (Junior Scientist at *Knight Piesold Consulting*) <br/>
 Nate Smith (Senior Engineer at *Knight Piesold Consulting*) <br/><br/>
-Last Update 12/19/2019 <br/>
+Last Update Jan/21/2020 <br/>
 Last Change: Added Frequency Analysis Tab and Functionality <br/>
 
 ### Overview
