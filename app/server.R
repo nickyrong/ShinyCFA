@@ -53,17 +53,38 @@ map_data <- tidyhydat::allstations %>%
 
 # ------------ HYDAT data processing ------------
 # A function to wrangle the tidyhydat table into FlowScreen compatible format
-read.wsc.flows <- function(station_number) {
+read.wsc.flows <- function(station_number, type = "Qdaily") {
 
-    # read Qdaily from HYDAT
-    Q_Daily = tidyhydat::hy_daily_flows(station_number = station_number, hydat_path = Hydat_Location)
 
-    # put the Qdaily into format readable by FlowScreen Package
-    wsc_input_df <- Q_Daily %>%
-        # Flow parameter: 1 = Flow, 2 = level
-        mutate(ID = station_number, PARAM = 1, Agency = "WSC") %>%
-        select(ID, PARAM, Date, Flow = Value, SYM = Symbol, Agency)
+    if(type == "Qdaily") {
+        
+        # read Qdaily from HYDAT
+        Q_Daily = tidyhydat::hy_daily_flows(station_number = station_number, hydat_path = Hydat_Location)
+        
+        # put the Qdaily into format readable by FlowScreen Package
+        wsc_input_df <- Q_Daily %>%
+                        filter(Parameter == 'Flow') %>%
 
+            # Flow parameter: 1 = Flow, 2 = level
+            mutate(ID = station_number, PARAM = 1, Agency = "WSC") %>%
+            select(ID, PARAM, Date, Flow = Value, SYM = Symbol, Agency)
+
+        
+    } else if (type == "Qinst") {
+        
+        # read Qinst from HYDAT
+        Q_Inst = tidyhydat::hy_annual_instant_peaks(station_number = station_number, hydat_path = Hydat_Location)
+        
+        # put the QiNST into format readable by FlowScreen Package
+        wsc_input_df <- Q_Inst %>%
+                        filter(Parameter == 'Flow',
+                               PEAK_CODE == 'MAX') %>%
+            
+            # Flow parameter: 1 = Flow, 2 = level
+            mutate(ID = station_number, PARAM = 1, Agency = "WSC") %>%
+            select(ID, PARAM, Date, Flow = Value, SYM = Symbol, Agency)
+    }
+    
     return(wsc_input_df)
 } # EOF read.wsc.flows()
 
@@ -99,7 +120,7 @@ lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
 
     lmoms <- samlmu(Qp, nmom = 5)
     log.lmoms <- samlmu(log10(Qp),nmom = 5)
-    
+
     error_value <- as.numeric(rep(NA, length(Pnonexc)))
     # using tryCatch to allow the app to continue running if a particular distibution can't be fit to the data
     extremes <- tibble(ReturnPeriods = ReturnPeriods,
@@ -181,7 +202,7 @@ shinyServer(function(input, output) {
     # Station Dataset Summarized
     # Uses user input from the resolution dropdown
     Dataset_Summarize <- reactive({
-        TS <- read.wsc.flows(station_number = id.check()) %>%
+        TS <- read.wsc.flows(station_number = id.check(), type = input$Qtype) %>%
             mutate(Year = year(Date) , Month = month(Date), Day = day(Date)) %>%
             select(Date, Year, Month, Day, Flow, Symbol = SYM)
 
@@ -262,7 +283,7 @@ shinyServer(function(input, output) {
     output$graph <- renderDygraph({
 
         # Spread the flow data by the flag
-        TS <- read.wsc.flows(station_number = id.check()) %>%
+        TS <- read.wsc.flows(station_number = id.check(), type = input$Qtype) %>%
             select(Date, Flow, Symbol = SYM)
         codes <- as.factor(TS$Symbol)
         codes <- match(codes, SYMs)
@@ -340,83 +361,107 @@ shinyServer(function(input, output) {
 
     # Reactive statement to generate complete years for the FFA
     FFA_Years <- reactive({
-        complete.years <- read.wsc.flows(station_number = id.check()) %>%
+        
+        req(input$Qtype)
+        
+        # Only drop years with Qdaiy, force Qtype in read.wsc.flows()
+        complete.years <- read.wsc.flows(station_number = id.check(), type = "Qdaily") %>%
             mutate(Year = year(Date)) %>%
             drop_na(Flow) %>%
             group_by(Year) %>%
             count(Year) %>%
             filter(n >= input$selector_days) %>% # discard incomplete years based on day selection
             pull(Year)
-        
+
         complete.years
     })
-    
+
     # Output years for year removal selector in the ui
     output$year_list <- renderUI({
         selectizeInput('selector_years', 'Remove Years',
                        choices = FFA_Years(), multiple = TRUE)
     })
-    
+
     # Subset FFA based on selection
     FFA <- reactive({
         complete.years <- FFA_Years()
-        empirical.ffa <- read.wsc.flows(station_number = id.check()) %>%
-            filter(year(Date) %in% complete.years) %>% #only include complete years
-            filter(month(Date) >= input$selector_months[1] & month(Date) <= input$selector_months[2]) %>% #subset based on month selection
-            drop_na(Flow) %>%
-            group_by(Year = year(Date)) %>%
-            summarize(AMS = max(Flow)) %>%
-            filter(!Year %in% input$selector_years) %>% #remove years the user has selected for removal
-            ungroup() %>%
-            mutate(Rank = base::rank(-AMS, ties.method = "random"),
-                   Tr = ((length(Rank)+1) / Rank)
-            ) %>%
-            arrange(Rank)
         
+        if(input$Qtype == "Qdaily") {
+            
+            empirical.ffa <- read.wsc.flows(station_number = id.check(), type = "Qdaily") %>%
+                filter(year(Date) %in% complete.years) %>% #only include complete years
+                filter(month(Date) >= input$selector_months[1] & month(Date) <= input$selector_months[2]) %>% #subset based on month selection
+                drop_na(Flow) %>%
+                group_by(Year = year(Date)) %>%
+                summarize(AMS = max(Flow)) %>%
+                filter(!Year %in% input$selector_years) %>% #remove years the user has selected for removal
+                ungroup() %>%
+                mutate(Rank = base::rank(-AMS, ties.method = "random"),
+                       Tr = ((length(Rank)+1) / Rank)
+                ) %>%
+                arrange(Rank)
+            
+        } else if(input$Qtype == "Qinst") {
+            
+            empirical.ffa <- read.wsc.flows(station_number = id.check(), type = "Qinst") %>%
+                filter(year(Date) %in% complete.years) %>% #only include complete years
+                # Cannot subset by months
+                drop_na(Flow) %>%
+                group_by(Year = year(Date)) %>%
+                summarize(AMS = max(Flow)) %>%
+                filter(!Year %in% input$selector_years) %>% #remove years the user has selected for removal
+                ungroup() %>%
+                mutate(Rank = base::rank(-AMS, ties.method = "random"),
+                       Tr = ((length(Rank)+1) / Rank)
+                ) %>%
+                arrange(Rank)
+        }
+
+
         empirical.ffa
     })
-    
+
     # Output number of complete years for FFA
-    output$FFA_complete_years <- renderText({ 
+    output$FFA_complete_years <- renderText({
         if(nrow(FFA()) > 1) (
             paste("Complete Years:", nrow(FFA()))
         ) else (
             paste("Complete Years:", nrow(FFA()), "(Insufficient Years)")
         )
     })
-    
-    
+
+
     # AMS DataTable
     output$AMS.table <- DT::renderDataTable({
         empirical.ffa <- FFA.Allow()
-        
+
         empirical.ffa <- empirical.ffa %>%
             mutate(Return_Period = round(Tr, 1)) %>%
             select(-Tr)
-        
+
         empirical.ffa %>% DT::datatable(
             # Options for data table formatting
             extensions = c('Buttons', 'FixedColumns'),
             options = list(
-                
+
                 # Options for extension "Buttons"
                 dom = 'Bfrtip',
-                
+
                 buttons = list(I('colvis')),
-                
+
                 columnDefs = list(list(className = "dt-center", targets = "_all")),
-                
+
                 # Options for extension "FixedColumns"
                 scrollX = TRUE,
-                
+
                 # Options for extension "Scroller"
                 deferRender = TRUE,
                 scroller = TRUE
-                
+
             )
         )
     })
-    
+
     # Reactive statement to allow FFA to run only if number of years is > 1
     FFA.Allow <- reactive({
         req(nrow(FFA()) > 1)
@@ -448,21 +493,21 @@ shinyServer(function(input, output) {
             # Options for data table formatting
             extensions = c('Buttons', 'FixedColumns'),
             options = list(
-    
+
                 # Options for extension "Buttons"
                 dom = 'Bfrtip',
-    
+
                 buttons = list(I('colvis')),
-    
+
                 columnDefs = list(list(className = "dt-center", targets = "_all")),
-    
+
                 # Options for extension "FixedColumns"
                 scrollX = TRUE,
-    
+
                 # Options for extension "Scroller"
                 deferRender = TRUE,
                 scroller = TRUE
-    
+
             )
         )
     })
@@ -472,22 +517,34 @@ shinyServer(function(input, output) {
 
         empirical.ffa <- FFA.Allow()
         desired_columns <- Dist_Key[match(input$selector_dist, Dist_Options)]
-        
+
         ffa_results <- lmom_Q(Qp = empirical.ffa$AMS, evaluation = "Plot") %>%
             select(-Pnonexc) %>%
             select(ReturnPeriods, !!desired_columns)
-    
+
         ffa_results <- gather(ffa_results, "Distribution", "Q", -1)
-    
+
         if (length(desired_columns) > 0) (
+            
             ffa_plot <- ggplot(ffa_results, aes(x = ReturnPeriods, y = Q, color = Distribution)) +
                             geom_line() + theme_bw() +
-                            scale_y_continuous(name = "Q (m3/s)", limits=c(0, NA)) +
                             geom_point(data = empirical.ffa, aes(x = Tr, y = AMS, colour = "Observed")) +
                             scale_x_log10(name = "Annual Return Periods") +
-                            ggtitle("Flood Frequency Analysis")
+                            ggtitle("Flood Frequency Analysis") + 
+                
+                if(input$Qtype == "Qdaily") {
+                    ffa_plot <- ffa_plot + scale_y_continuous(name = 'Q Daily~(m^3/s)', limits=c(0, NA))
+                } +
+                
+                if(input$Qtype == "Qinst") {
+                    ffa_plot <- ffa_plot + scale_y_continuous(name = 'Q Instantaneous (m^3/s)', limits=c(0, NA))
+                }
+            
+            
+            
+
         )
-        
+
         if (length(desired_columns) > 0) (ggplotly(ffa_plot))
     })
 

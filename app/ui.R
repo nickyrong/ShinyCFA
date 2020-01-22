@@ -64,9 +64,12 @@ shinyUI(fluidPage(
                          "This is an interactive graph: drag to zoom in and double click to zoom out"
                 ),
 
-                tabPanel("Frequency Analysis",
+                tabPanel("Flood Frequency Analysis (Advanced)",
                     br(),
                     fluidRow(
+                        column(4,
+                              selectInput('Qtype', "", c("Qdaily" = "Qdaily", "Qinst" = "Qinst"),
+                                          selected = "Qdaily")),
                         column(4,
                                 sliderInput('selector_days', 'Complete Days/Year',
                                             min = 0, max = 365, value = 355)),
@@ -85,10 +88,10 @@ shinyUI(fluidPage(
                         column(6,
                                selectizeInput('selector_dist', 'Select Distributions',
                                               choices = Dist_Options, multiple = TRUE)),
-                        column(6,    
+                        column(6,
                                selectizeInput('selector_Tr', 'Select Return Periods (Years)',
                                               choices = Tr_Options, multiple = TRUE,
-                                              options = list(maxItems = 10), selected = 200))),
+                                              options = list(maxItems = 10), selected = 2))),
                     DT::dataTableOutput("ffa.table"),
                     br(),
                     plotlyOutput("ffa.figure")
