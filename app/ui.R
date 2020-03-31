@@ -11,7 +11,7 @@ Tr_Options <- c(2, 5, 10, 20, 25, 30, 40, 50, 75, 100, 200, 250, 300,
                 400, 500, 1000, 2500, 10000)
 
 
-# Define UI for application that draws a histogram
+# Define UI
 shinyUI(fluidPage(
 
     pageWithSidebar(

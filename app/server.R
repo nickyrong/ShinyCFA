@@ -52,7 +52,7 @@ map_data <- tidyhydat::allstations %>%
 
 
 # ------------ HYDAT data processing ------------
-# A function to wrangle the tidyhydat table into FlowScreen compatible format
+# A function to wrangle the tidyhydat table into FlowScreen compatible format for potential future use
 read.wsc.flows <- function(station_number, type = "Qdaily") {
 
 
@@ -61,7 +61,7 @@ read.wsc.flows <- function(station_number, type = "Qdaily") {
         # read Qdaily from HYDAT
         Q_Daily = tidyhydat::hy_daily_flows(station_number = station_number, hydat_path = Hydat_Location)
         
-        # put the Qdaily into format readable by FlowScreen Package
+        # put the Qdaily into format readable by FlowScreen Package for potential future use
         wsc_input_df <- Q_Daily %>%
                         filter(Parameter == 'Flow') %>%
 
@@ -75,7 +75,7 @@ read.wsc.flows <- function(station_number, type = "Qdaily") {
         # read Qinst from HYDAT
         Q_Inst = tidyhydat::hy_annual_instant_peaks(station_number = station_number, hydat_path = Hydat_Location)
         
-        # put the QiNST into format readable by FlowScreen Package
+        # put the QiNST into format readable by FlowScreen Package for potential future use
         wsc_input_df <- Q_Inst %>%
                         filter(Parameter == 'Flow',
                                PEAK_CODE == 'MAX') %>%
@@ -159,14 +159,6 @@ lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
 # Define server logic
 shinyServer(function(input, output) {
 
-    # ----------- For the ReadMe HTML -----------
-    # Directly using includeHTML in ui.R will break Shiny (stop execution of everything follows)
-
-    output$ReadMe_HTML <- renderUI({
-        includeHTML("./ReadMe.html")
-
-    })
-
 
     # Status if station is invalid
     output$status <- renderText({
@@ -213,25 +205,43 @@ shinyServer(function(input, output) {
         TS <- mutate(TS, Flag = codes) %>% select(-Symbol)
 
         if(input$Reso == "Daily"){
-            TS$Flow <- round(TS$Flow, digits = 0)
+            TS$Flow <- round(TS$Flow, digits = 3)
         }
 
         else if(input$Reso == "Monthly"){
             TS <- TS %>% group_by(Year, Month) %>%
                 summarise(Average_Flow = mean(Flow, na.rm = TRUE), Count = sum(is.na(Flow)==FALSE))
-            TS$Average_Flow <- round(TS$Average_Flow, digits = 0)
+            TS$Average_Flow <- round(TS$Average_Flow, digits = 2)
         }
 
         else if(input$Reso == "Yearly"){
             TS <- TS %>% group_by(Year) %>%
                 summarise(Average_Flow = mean(Flow, na.rm = TRUE), Max_Daily = max(Flow, na.rm = TRUE),
                           Min_Daily = min(Flow, na.rm = TRUE), Count = sum(is.na(Flow) == FALSE)) %>%
-                round(digits = 0)
+                round(digits = 2)
         }
         TS
     })
+    
+    # Download Data button
+    output$downloadData <- downloadHandler(
+        filename = function() {
+            paste(id.check(), ".csv", sep = "")
+        },
+        content = function(file) {
+            write.csv(Dataset(), file, row.names = FALSE)
+        }
+    ) # End of csv file download
+    
+    # ----------- REAMDE tab----------- -----------
+    # Directly using includeHTML in ui.R will break Shiny (stop execution of everything follows)
+    
+    output$ReadMe_HTML <- renderUI({
+        includeHTML("./ReadMe.html")
+        
+    })
 
-    # ------------ Station Map Plotting ------------
+    # -------- Station Map Plotting tab -----------
     output$MapPlot <- renderLeaflet({
         map_data %>%
             leaflet() %>%
@@ -240,7 +250,7 @@ shinyServer(function(input, output) {
     })
 
 
-    # ------------ Data Table ----------------------
+    # ------------ Data Table tab-------------------
     output$table <- DT::renderDataTable({
 
         Dataset_Summarize() %>% DT::datatable(
@@ -268,7 +278,7 @@ shinyServer(function(input, output) {
 
     })
 
-    # ------------ Download Data Table ------------
+    # Download Data Table
     output$downloadSummary <- downloadHandler(
         filename = function() {
             paste(id.check(), "_", as.character(input$Reso),".csv", sep = "")
@@ -347,17 +357,7 @@ shinyServer(function(input, output) {
     }) # End of interactive graph
 
 
-    # Download Data button
-    output$downloadData <- downloadHandler(
-        filename = function() {
-            paste(id.check(), ".csv", sep = "")
-        },
-        content = function(file) {
-            write.csv(Dataset(), file, row.names = FALSE)
-        }
-    ) # End of csv file download
-
-    # ------------ Frequency Analysis ------------
+    # ------------ Frequency Analysis tab --------
 
     # Reactive statement to generate complete years for the FFA
     FFA_Years <- reactive({
@@ -435,13 +435,18 @@ shinyServer(function(input, output) {
         )
     })
 
+    # Reactive statement to allow FFA to run only if number of years is > 1
+    FFA.Allow <- reactive({
+        req(nrow(FFA()) > 1)
+        FFA()
+    })
 
     # AMS DataTable
     output$AMS.table <- DT::renderDataTable({
         empirical.ffa <- FFA.Allow()
 
         empirical.ffa <- empirical.ffa %>%
-            mutate(Return_Period = round(Tr, 1)) %>%
+            mutate(Return_Period = round(Tr, 2)) %>%
             select(ID, Year, Date, AMS, Rank, Return_Period, SYM)
 
         empirical.ffa %>% DT::datatable(
@@ -449,31 +454,19 @@ shinyServer(function(input, output) {
             extensions = c('Buttons', 'FixedColumns'),
             options = list(
 
-                # Options for extension "Buttons"
-                dom = 'Bfrtip',
-
-                buttons = list(I('colvis')),
-
                 columnDefs = list(list(className = "dt-center", targets = "_all")),
 
                 # Options for extension "FixedColumns"
                 scrollX = TRUE,
-
-                # Options for extension "Scroller"
-                deferRender = TRUE,
-                scroller = TRUE
-
+                
+                # Rows
+                lengthMenu = list(c(10, 25, -1), c('10', '25', 'All')),
+                pageLength = 10
             )
         )
     })
 
-    # Reactive statement to allow FFA to run only if number of years is > 1
-    FFA.Allow <- reactive({
-        req(nrow(FFA()) > 1)
-        FFA()
-    })
-
-    # ------------ FFA DataTable ------------
+    # FFA DataTable
     output$ffa.table <- DT::renderDataTable({
 
         empirical.ffa <- FFA.Allow()
@@ -481,15 +474,15 @@ shinyServer(function(input, output) {
 
         if (length(input$selector_Tr) < 1) (
             ffa_results <- lmom_Q(Qp = empirical.ffa$AMS) %>%
-                mutate_at(vars(-Pnonexc), round(., 0)) %>%
-                mutate_at(vars(Pnonexc), round(., 3)) %>%
+                mutate_at(vars(-Pnonexc), round(., 2)) %>%
+                mutate_at(vars(Pnonexc), round(., 2)) %>%
                 select(ReturnPeriods, Pnonexc, !!desired_columns) %>%
                 rename("Return Periods" = ReturnPeriods, "Probability Non-Exc" = Pnonexc)
 
         ) else (
             ffa_results <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = as.integer(input$selector_Tr)) %>%
-                mutate_at(vars(-Pnonexc), funs(round(., 0))) %>%
-                mutate_at(vars(Pnonexc), funs(round(., 3))) %>%
+                mutate_at(vars(-Pnonexc), funs(round(., 2))) %>%
+                mutate_at(vars(Pnonexc), funs(round(., 2))) %>%
                 select(ReturnPeriods, Pnonexc, !!desired_columns) %>%
                 rename("Return Periods" = ReturnPeriods, "Probability Non-Exc" = Pnonexc)
         )
@@ -517,7 +510,7 @@ shinyServer(function(input, output) {
         )
     })
 
-    # ------------ FFA Plot ------------
+    # FFA Plot
     output$ffa.figure <- renderPlotly({
 
         empirical.ffa <- FFA.Allow()
@@ -549,7 +542,7 @@ shinyServer(function(input, output) {
     })
 
 
-    # ------------ AMS Plot ------------
+    # AMS Plot
     output$max.figure <- renderPlotly({
 
         empirical.ffa <- FFA.Allow()

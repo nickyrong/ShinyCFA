@@ -2,7 +2,7 @@
 
 ## Install and load packages
 package_list <- c("shiny", "tidyhydat", "leaflet", "dplyr", "lubridate", "readr",
-                  "xts", "dygraphs", "tidyverse", "lmom", "plotly")
+                  "xts", "dygraphs", "tidyverse", "lmom", "plotly", "rlang")
 
 missing_list <- package_list %in% rownames(installed.packages())
 
