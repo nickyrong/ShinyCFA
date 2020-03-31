@@ -237,7 +237,7 @@ shinyServer(function(input, output) {
     # Directly using includeHTML in ui.R will break Shiny (stop execution of everything follows)
     
     output$ReadMe_HTML <- renderUI({
-        includeHTML("./ReadMe.html")
+        includeHTML("./Intro_tab.html")
         
     })
 
@@ -481,8 +481,8 @@ shinyServer(function(input, output) {
 
         ) else (
             ffa_results <- lmom_Q(Qp = empirical.ffa$AMS, empirical.Tr = as.integer(input$selector_Tr)) %>%
-                mutate_at(vars(-Pnonexc), funs(round(., 2))) %>%
-                mutate_at(vars(Pnonexc), funs(round(., 2))) %>%
+                mutate_at(vars(-Pnonexc), list(~round(., 2))) %>%
+                mutate_at(vars(Pnonexc), list(~round(., 2))) %>%
                 select(ReturnPeriods, Pnonexc, !!desired_columns) %>%
                 rename("Return Periods" = ReturnPeriods, "Probability Non-Exc" = Pnonexc)
         )
