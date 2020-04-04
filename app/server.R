@@ -408,7 +408,7 @@ shinyServer(function(input, output) {
         } else if(input$Qtype == "Qinst") {
             
             empirical.ffa <- read.wsc.flows(station_number = id.check(), type = "Qinst") %>%
-                filter(year(Date) %in% complete.years) %>% #only include complete years
+                filter(year(Date) %in% complete.years) %>%
                 # Cannot subset by months
                 drop_na(Flow) %>%
                 group_by(Year = year(Date)) %>%
