@@ -66,12 +66,16 @@ shinyUI(fluidPage(
 
                 tabPanel("Flood Frequency Analysis (Advanced)",
                     br(),
+                    "NOTE: Year selection is currently based on the Qdaily Series; therefore, 
+                    the year selector list may have more years than are available in the Qinst series.
+                    Also, the month range selector does not apply to Qinst.",
+                    br(),
                     fluidRow(
                         column(4,
                               selectInput('Qtype', "", c("Qdaily" = "Qdaily", "Qinst" = "Qinst"),
                                           selected = "Qdaily")),
                         column(4,
-                                sliderInput('selector_days', 'Complete Days/Year',
+                                sliderInput('selector_days', 'Complete Days per Year',
                                             min = 0, max = 365, value = 355)),
                         column(4,
                                 sliderInput('selector_months', 'Month Range Selection',
@@ -83,7 +87,7 @@ shinyUI(fluidPage(
                     DT::dataTableOutput("AMS.table"),
                     br(),
                     plotlyOutput("max.figure"),
-                    br(),
+                    br(), br(),
                     fluidRow(
                         column(6,
                                selectizeInput('selector_dist', 'Select Distributions',
