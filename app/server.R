@@ -14,6 +14,7 @@ library(rlang)
 library(renv)
 library(shinyalert) # for pop-up message in the data removal tab
 library(shinybusy) # busy indicator for rendering plots/tables
+library(FlowScreen)
 
 
 source("./functions.R")
@@ -46,11 +47,10 @@ shinyServer(function(input, output, session) {
     validate(
       need(input$stn_id_input, "Invalid Station ID"))
     
-    # Return Station Name
-    tidyhydat::allstations %>% 
-      filter(STATION_NUMBER == input$stn_id_input) %>% 
-      select(STATION_NAME) %>% 
-      as.character()
+    # Return Station Name & Info
+    map_data %>% filter(STATION_NUMBER == input$stn_id_input) %>%
+      select(text) %>% as.character()
+    
     
   })
   
@@ -146,7 +146,82 @@ shinyServer(function(input, output, session) {
     dy_plots
     
   }) # End of interactive graph
+  
+  
+  
 
+  # -5- Data Summary Tab ---------------------------------------
+  
+  # the summrized data are needed in both table rendering and download button
+  summarized <- reactive({
+    
+    data <- Dataset_Summarize(station_number = input$stn_id_input,
+                              summary_period = input$sum_period)
+    
+    data # return data
+    
+  })
+  
+  output$table <- DT::renderDataTable({
+    
+     summarized()%>% 
+      
+      DT::datatable(
+      # Data table formatting options
+      extensions = c('Buttons', 'FixedColumns', 'Scroller'),
+      options = list(
+        
+        # Options for extension "Buttons"
+        dom = 'Bfrtip',
+        
+        buttons = list(I('colvis')),
+        
+        columnDefs = list(list(className = "dt-center", targets = "_all")),
+        
+        # Options for extension "FixedColumns"
+        scrollX = TRUE,
+        fixedColumns = TRUE,
+        
+        # Options for extension "Scroller"
+        deferRender = TRUE,
+        scrollY = 600,
+        scroller = TRUE
+      )
+    )
+    
+  })# end of summary table render block
+  
+  # Summarized Data Download button
+  output$downloadSummary <- downloadHandler(
+    filename = function() {
+      paste0(input$stn_id_input,"_", input$sum_period, ".csv")
+    },
+    content = function(file) {
+      write.csv(summarized(), file, row.names = FALSE)
+    }
+  ) # End of csv file download
+  
+  
+  # -6- Hydrograph Tab ---------------------------------------
+  
+  output$hydrograph <- renderPlot({
+
+    flow <- read_dailyflow(input$stn_id_input)
+    
+    flow %>%
+      # FlowScreen package uses blank to represent "NA"
+      mutate(SYM = replace_na(SYM,"")) %>% 
+      # Definition of WY changes day of year calculation
+      create.ts(hyrstart = as.numeric(input$wy_start)) %>%
+      
+      # Let user define y-axis limit (by % of max value)
+      # lims must be defined as c(min, max)
+      regime(y.lims = 
+               c(0, as.numeric(input$hydrograph_ylim)/100 * max(flow$Flow, na.rm = TRUE)))
+      
+    
+  })
+  
   
   
 }) # End of ShinyServer(){}

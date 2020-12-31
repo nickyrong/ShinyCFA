@@ -1,3 +1,17 @@
+# Variables needed globally
+# Create flag names and plotting colours for data symbols
+SYMs <- c("", "E", "A", "B", "D", "R", "RealTime")
+SYMnames <- c("No Code", "Estimate", "Partial Day", "Ice Conditions", "Dry", "Revised", "RealTime")
+SYMcol <- c("grey", "#E41A1C", "#4DAF4A", "#377EB8", "#FF7F00", "#984EA3", "#FFA500")
+
+# Distributions List for Flood Frequency Analyis (FFA)
+Dist_Options <- c("Exponential", "Gamma", "GEV", "Gen. Logistic", "Gen. Normal", "Gen. Pareto",
+                  "Gumbel", "Kappa", "Normal", "Pearson III", "Wakeby", "Weibull", "Log-Normal", "LP3")
+Dist_Key <- c("Qp.exp", "Qp.gam", "Qp.gev", "Qp.glo", "Qp.gno", "Qp.gpa",
+              "Qp.gum", "Qp.kap", "Qp.nor", "Qp.pe3", "Qp.wak", "Qp.wei", "Qp.ln3", "Qp.LP3")
+
+
+
 # Generate the data for the map by calling coordinates, labels, and date ranges from the HYDAT database
 range.df <-  tidyhydat::hy_stn_data_range(hydat_path = Hydat_Location) %>%
   
@@ -49,13 +63,18 @@ read_dailyflow <- function(station_number) {
   # unfortunately WSC Datamart only provides most recent 30-days data
   # up to 18-month of real time data can be downloaded from WSC website
   # https://wateroffice.ec.gc.ca/search/real_time_e.html
-  rt_daily <- realtime_dd(station_number) %>% 
-                  realtime_daily_mean() %>% 
-                  filter(Parameter == "Flow") %>%
-                  select(-PROV_TERR_STATE_LOC) %>%
-                  mutate(Symbol = "RealTime")
   
-  Q_daily <- bind_rows(hy_daily, rt_daily) %>%
+  # Second thought...maybe real time data is not worth it...
+  
+  #rt_daily <- realtime_dd(station_number) %>% 
+  #                realtime_daily_mean() %>% 
+  #                filter(Parameter == "Flow") %>%
+  #                select(-PROV_TERR_STATE_LOC) %>%
+  #                mutate(Symbol = "RealTime")
+  
+  #Q_daily <- bind_rows(hy_daily, rt_daily) %>%
+  
+  Q_daily <- hy_daily %>%
     # put the Qdaily into format readable by FlowScreen Package for potential future use
     # Flow parameter: 1 = Flow, 2 = level
     mutate(ID = station_number, PARAM = 1, Agency = "WSC") %>%
@@ -65,16 +84,47 @@ read_dailyflow <- function(station_number) {
   return(Q_daily)
 } # EOF read_dailyflow
 
-# Create flag names and plotting colours for data symbols
-SYMs <- c("", "E", "A", "B", "D", "R", "RealTime")
-SYMnames <- c("No Code", "Estimate", "Partial Day", "Ice Conditions", "Dry", "Revised", "RealTime")
-SYMcol <- c("grey", "#E41A1C", "#4DAF4A", "#377EB8", "#FF7F00", "#984EA3", "#FFA500")
 
-# Distributions List for Flood Frequency Analyis (FFA)
-Dist_Options <- c("Exponential", "Gamma", "GEV", "Gen. Logistic", "Gen. Normal", "Gen. Pareto",
-                  "Gumbel", "Kappa", "Normal", "Pearson III", "Wakeby", "Weibull", "Log-Normal", "LP3")
-Dist_Key <- c("Qp.exp", "Qp.gam", "Qp.gev", "Qp.glo", "Qp.gno", "Qp.gpa",
-              "Qp.gum", "Qp.kap", "Qp.nor", "Qp.pe3", "Qp.wak", "Qp.wei", "Qp.ln3", "Qp.LP3")
+# Station Dataset Summarized
+# Uses user input from the resolution dropdown
+Dataset_Summarize <- function(station_number, summary_period) {
+  
+  TS <- read_dailyflow(station_number = station_number) %>%
+    mutate(Year = year(Date) , Month = month(Date), Day = day(Date)) %>%
+    select(Date, Year, Month, Day, Flow, Symbol = SYM)
+  
+  codes <- as.factor(TS$Symbol)
+  codes <- match(codes, SYMs)
+  codes <- SYMnames[codes]
+  
+  TS <- mutate(TS, Flag = codes) %>% select(-Symbol)
+  
+  if(summary_period == "Daily"){
+    TS$Flow <- round(TS$Flow, digits = 3)
+  }
+  
+  else if(summary_period == "Monthly"){
+    TS <- TS %>% group_by(Year, Month) %>%
+      summarise(Average_Flow = mean(Flow, na.rm = TRUE), Count = sum(is.na(Flow)==FALSE),
+                .groups = "drop")
+    TS$Average_Flow <- round(TS$Average_Flow, digits = 3)
+  }
+  
+  else if(summary_period == "Yearly"){
+    TS <- TS %>% group_by(Year) %>%
+      summarise(Average_Flow = mean(Flow, na.rm = TRUE), Max_Daily = max(Flow, na.rm = TRUE),
+                Min_Daily = min(Flow, na.rm = TRUE), Count = sum(is.na(Flow) == FALSE),
+                .groups = "drop") %>%
+      round(digits = 3)
+  }
+  
+  return(TS)
+} # EOF for flow period summary
+
+
+
+
+
 
 # ---------------- FFA FUNCTION ------------------
 lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {

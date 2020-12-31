@@ -39,7 +39,7 @@ shinyUI(fluidPage(
                      options = list(maxOptions = 5)),
       downloadButton("downloadData", "Download Data"),
       br(),
-      h5(textOutput("stn_input_name"))
+      h5(htmlOutput("stn_input_name"))
     ),
     
     mainPanel(
@@ -77,11 +77,42 @@ shinyUI(fluidPage(
                    ), # End of Time Series sub-tab
                    
                    #---- Sub tab: Data Summary Table
-                   tabPanel("Summary Table"
+                   tabPanel("Summary Table",
+                            
+                            br(),
+                            "Select Daily, Monthly, or Yearly Resolution",
+                            selectInput("sum_period", "", c("Daily" = "Daily", "Monthly" = "Monthly", "Yearly" = "Yearly"),
+                                        selected = "Daily"), p(""),
+                            downloadButton("downloadSummary", "Download Summary Data"),
+                            br(), br(),
+                            DT::dataTableOutput("table")
                    ), # End of Data Summary Table sub-tab
                    
                    #---- Sub tab: Data Summary Table
-                   tabPanel("Hydrograph"
+                   tabPanel("Hydrograph",
+                            br(),
+                            fluidRow(
+                              column(6,
+                                     "Select Start of Water Year",
+                                     selectInput("wy_start", "", 
+                                                  c("January" = 1, "February" = 2, "March" = 3,
+                                                    "April" = 4, "May" = 5, "June" = 6,
+                                                    "July" = 7, "August" = 8, "September" = 9,
+                                                    "October" = 10, "November" = 11, "December" = 12),
+                                                 selected = "January"), p(""),
+                              ),
+                              
+                              column(6,
+                                     "Y-axis Limit",
+                                     sliderInput('hydrograph_ylim', '% of Max Value',
+                                                 min = 1, max = 100, value = 100)
+                                     )
+                              ),# End of fluidRow
+
+
+                            br(), 
+                            plotOutput("hydrograph"),
+                            br()
                    ) # End of Hydrograph sub-tab
                    
                  ) # End of all sub-tabs
@@ -89,7 +120,21 @@ shinyUI(fluidPage(
         
         
         
-        tabPanel("Frequency Analysis"
+        tabPanel("Frequency Analysis",
+                 
+                 #Sub-tabs
+                 tabsetPanel(
+                   
+                   #---- Sub tab: Qdaily
+                   tabPanel("Daily Q"
+                   ), # End of Q daily Frequency sub-tab
+                   
+                   #---- Sub tab: Frequency Distribution
+                   tabPanel("Instantaneous Q"
+                   ) # End of Q Inst sub-tab
+                   
+
+                 ) # End of all sub-tabs
         )
         
       ) # End of tabsetPanel
