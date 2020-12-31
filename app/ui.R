@@ -4,108 +4,98 @@ library(leaflet)
 library(dygraphs)
 library(plotly)
 library(renv)
+library(shinycssloaders) # withSpinner() indicate calculation/rendering in progress
+library(shinythemes)
+library(shinyalert) # for pop-up message in the data removal tab
 
-# Lists
-Dist_Options <- c("Exponential", "Gamma", "GEV", "Gen. Logistic", "Gen. Normal", "Gen. Pareto",
-                  "Gumbel", "Kappa", "Normal", "Pearson III", "Wakeby", "Weibull", "Log-Normal", "LP3")
-Tr_Options <- c(2, 5, 10, 20, 25, 30, 40, 50, 75, 100, 200, 250, 300,
-                400, 500, 1000, 2500, 10000)
 
 
 # Define UI
 shinyUI(fluidPage(
-
-    pageWithSidebar(
-
-        headerPanel('Water Survey of Canada Hydrometric Stations'),
-
-        sidebarPanel(
-            width = 3,
-            "Enter a valid WSC Station ID",
-            br(), br(),
-            textInput("stn.id", label = h3("WSC Station ID"), value = "08GA010"),
-            downloadButton("downloadData", "Download Data"),
-            br(),
-            h3(textOutput("status"))
+  
+  # Change font color of error message to red
+  tags$head(
+    tags$style(HTML("
+      .shiny-output-error-validation {
+        color: red;
+        font-weight: bold;
+      }
+    "))
+  ),
+  
+  # SideBar UI configuration
+  pageWithSidebar(
+    
+    headerPanel('Water Survey of Canada Hydrometric Data Tool'),
+    
+    sidebarPanel(
+      width = 3,
+      "Enter a valid WSC Station ID",
+      br(), br(),
+      # https://shiny.rstudio.com/articles/selectize.html
+      selectizeInput("stn_id_input", label = h3("WSC Station ID"), selected = "08GA010",
+                     choices = NULL,
+                     multiple= FALSE,
+                     options = list(maxOptions = 5)),
+      downloadButton("downloadData", "Download Data"),
+      br(),
+      h5(textOutput("stn_input_name"))
+    ),
+    
+    mainPanel(
+      tabsetPanel(
+        tabPanel("Read Me"
         ),
-
-        mainPanel(
-            tabsetPanel(
-                tabPanel("Read Me", htmlOutput("ReadMe_HTML")
-                ),
-
-                tabPanel("Stations Map",
-                         br(),
-                         h3("Database is still loading if map is not visible"),
-                         br(),
-                         leafletOutput("MapPlot", height = 800),
-                         "Zoom into map to see station locations",
-                         br(),
-                         "Click on a location to see Station ID, Station Name, and Status: active/discontinued"
-                ),
-
-
-                tabPanel("Data Table",
-                         br(),
-                         textOutput("name"),
-                         br(),
-                         "Select Daily, Monthly, or Yearly Resolution",
-                         selectInput("Reso", "", c("Daily" = "Daily", "Monthly" = "Monthly", "Yearly" = "Yearly"),
-                                     selected = "Daily"), p(""),
-                         downloadButton("downloadSummary", "Download Summary Data"),
-                         br(), br(),
-                         DT::dataTableOutput("table")
-                ),
-
-
-                tabPanel("Time Series",
-                         br(),
-                         dygraphOutput(outputId = "graph", height = "600px"),
-                         br(),
-                         "This is an interactive graph: drag to zoom in and double click to zoom out"
-                ),
-
-                tabPanel("Flood Frequency Analysis (Advanced)",
-                    br(),
-                    "NOTE: Year selection is currently based on the Qdaily Series; therefore, 
-                    the year selector list may have more years than are available in the Qinst series.
-                    Also, the month range selector does not apply to Qinst.",
-                    br(),
-                    fluidRow(
-                        column(4,
-                              selectInput('Qtype', "", c("Qdaily" = "Qdaily", "Qinst" = "Qinst"),
-                                          selected = "Qdaily")),
-                        column(4,
-                                sliderInput('selector_days', 'Complete Days per Year',
-                                            min = 0, max = 365, value = 355)),
-                        column(4,
-                                sliderInput('selector_months', 'Month Range Selection',
-                                            min = 1, max = 12, value = c(1,12))),
-                        column(4,
-                               uiOutput("year_list"))),
-                    textOutput("FFA_complete_years"),
-                    br(),
-                    DT::dataTableOutput("AMS.table"),
-                    br(),
-                    plotlyOutput("max.figure"),
-                    br(), br(),
-                    fluidRow(
-                        column(6,
-                               selectizeInput('selector_dist', 'Select Distributions',
-                                              choices = Dist_Options, multiple = TRUE)),
-                        column(6,
-                               selectizeInput('selector_Tr', 'Select Return Periods (Years)',
-                                              choices = Tr_Options, multiple = TRUE,
-                                              options = list(maxItems = 10), selected = 2))),
-                    DT::dataTableOutput("ffa.table"),
-                    br(),
-                    plotlyOutput("ffa.figure")
-                )
-
-            ) # End of tabsetPanel
-
-        ) # End of main panel
-
-    ) # End of pageWithSidebar
-
+        
+        tabPanel("Stations Map",
+                 br(),
+                 h3("Database is still loading if map is not visible"),
+                 br(),
+                 shinycssloaders::withSpinner( 
+                   leafletOutput("MapPlot", height = 800)
+                 ),#End of busy indicator
+                 "Zoom into map to see station locations",
+                 br(),
+                 "Click on a location to see Station ID, Station Name, and Status: active/discontinued"
+        ),
+        
+        
+        tabPanel("Explore Data",
+                
+                 #Sub-tabs
+                 tabsetPanel(
+                    
+                   #---- Sub tab: Time Series
+                   tabPanel("Time Series",
+                            br(),
+                            h3("Daily Average Discharge Data"),
+                            shinycssloaders::withSpinner(
+                              dygraphOutput(outputId = "tsgraph", height = "600px")
+                            ),
+                            br(),
+                            "This is an interactive graph: drag to zoom in and double click to zoom out"
+                   ), # End of Time Series sub-tab
+                   
+                   #---- Sub tab: Data Summary Table
+                   tabPanel("Summary Table"
+                   ), # End of Data Summary Table sub-tab
+                   
+                   #---- Sub tab: Data Summary Table
+                   tabPanel("Hydrograph"
+                   ) # End of Hydrograph sub-tab
+                   
+                 ) # End of all sub-tabs
+        ), # End of Explore Data tab
+        
+        
+        
+        tabPanel("Frequency Analysis"
+        )
+        
+      ) # End of tabsetPanel
+      
+    ) # End of main panel
+    
+  ) # End of pageWithSidebar
+  
 )) # End of shinyUI & fluidPage
