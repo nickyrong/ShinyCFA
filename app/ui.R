@@ -43,7 +43,7 @@ shinyUI(fluidPage(
       h6(htmlOutput('HYDAT_version')),
       br(), 
       # https://shiny.rstudio.com/articles/selectize.html
-      selectizeInput("stn_id_input", label = h3("WSC Station ID"), selected = "08GA010",
+      selectizeInput("stn_id_input", label = h3("WSC Station ID"),
                      choices = NULL,
                      multiple= FALSE,
                      options = list(maxOptions = 5)),
@@ -61,7 +61,8 @@ shinyUI(fluidPage(
     
     mainPanel(
       tabsetPanel(
-        tabPanel("Read Me"
+        tabPanel("Read Me",
+                 htmlOutput("README") #it is technically a markdown render but HTML works
         ),
         
         tabPanel("Stations Map",

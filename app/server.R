@@ -32,7 +32,7 @@ shinyServer(function(input, output, session) {
   # Station ID Selection by User
   updateSelectInput(session, 'stn_id_input',
                     choices = tidyhydat::allstations$STATION_NUMBER,
-                    selected = "08GA010"
+                    selected = "08GA031"
   )
   
   output$stn_input_info <- renderText({
@@ -107,6 +107,13 @@ shinyServer(function(input, output, session) {
   })
   
   # -2- ReadMe Tab --------------------------------------------
+  # using HTML will mess up CSS style/theme format for some reasons, use Markdown
+  
+  output$README <- renderUI({
+    
+    includeMarkdown("../README.md")
+    
+  })
   
   # -3- Map Tab -----------------------------------------------
   output$MapPlot <- renderLeaflet({
