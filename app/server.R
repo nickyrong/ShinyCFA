@@ -7,7 +7,7 @@ library(lubridate)
 library(readr)
 library(xts)
 library(dygraphs)
-library(tidyverse)
+library(tidyr)
 library(lmom)
 library(plotly)
 library(rlang)
@@ -16,18 +16,10 @@ library(shinyalert) # for pop-up message in the data removal tab
 library(shinybusy) # busy indicator for rendering plots/tables
 library(FlowScreen)
 
+# -------------- Custom Scripts ------------------
 
 source("./functions.R")
-source("./FlowScreen_hyear_internal_fixed.R")
-
-# ------------ HYDAT database loading ------------
-
-# Determine Hydat database location
-if(file.exists("./database/Hydat.sqlite3")) {
-  Hydat_Location <- "./database/Hydat.sqlite3"
-} else {
-  Hydat_Location <- tidyhydat::hy_default_db()
-}
+source("./FlowScreen_funs_fixed.R")
 
 # ------------ Shiny Server In/Output ------------
 
@@ -43,7 +35,7 @@ shinyServer(function(input, output, session) {
                     selected = "08GA010"
   )
   
-  output$stn_input_name <- renderText({
+  output$stn_input_info <- renderText({
     
     validate(
       need(input$stn_id_input, "Invalid Station ID"))
@@ -57,6 +49,9 @@ shinyServer(function(input, output, session) {
   
   # Central data processing: read Q daily
   Qdaily <- reactive({
+    
+    validate(
+      need(input$stn_id_input, "Invalid Station ID"))
     
     read_dailyflow(input$stn_id_input)
     
@@ -163,8 +158,12 @@ shinyServer(function(input, output, session) {
   # the summrized data are needed in both table rendering and download button
   summarized <- reactive({
     
+    validate(
+      need(input$stn_id_input, "Invalid Station ID"))
+    
     data <- Dataset_Summarize(station_number = input$stn_id_input,
-                              summary_period = input$sum_period)
+                              summary_period = input$sum_period,
+                              wy_month = as.numeric(input$wy_start))
     
     data # return data
     
@@ -218,7 +217,7 @@ shinyServer(function(input, output, session) {
       # FlowScreen package uses blank to represent "NA"
       mutate(SYM = replace_na(SYM,"")) %>% 
       # Definition of WY changes day of year calculation
-      create.ts(hyrstart = as.numeric(input$wy_start_hydrograph)) %>%
+      create.ts(hyrstart = as.numeric(input$wy_start)) %>%
       
       # Let user define y-axis limit (by % of max value)
       # lims must be defined as c(min, max)
@@ -230,13 +229,13 @@ shinyServer(function(input, output, session) {
   
   # -7- Trend Tests Tab ---------------------------------------
   
-  output$trend <- renderPlot({
+  output$trends <- renderPlot({
     
     Qdaily_ts <- Qdaily() %>%
       # FlowScreen package uses blank to represent "NA"
       mutate(SYM = replace_na(SYM,"")) %>% 
       # Definition of WY changes day of year calculation
-      FlowScreen::create.ts(hyrstart = as.numeric(input$wy_start_trend))
+      FlowScreen::create.ts(hyrstart = as.numeric(input$wy_start))
     
     
     Qdaily_res <- Qdaily_ts %>% FlowScreen::metrics.all()
@@ -250,5 +249,98 @@ shinyServer(function(input, output, session) {
   })
   
   
+  # -8- Frequency Analysis Tab ---------------------------------
+
+  
+  # Only keep complete years base on threshold selector
+  Qdaily_years <- reactive({
+
+    complete_years <- Qdaily() %>%
+      mutate(Year = year(Date)) %>%
+      drop_na(Flow) %>%
+      group_by(Year) %>%
+      count(Year) %>%
+      filter(n >= input$selector_days) %>% # discard incomplete years based on day selection
+      pull(Year)
+    
+    complete_years
+  })
+
+  # Need to observe years available for removal after input$selector_days
+  observe({
+    # Update Years Available for Removal
+    updateSelectInput(session, 'remove_year_Qdaily',
+                      choices = Qdaily_years()
+    )
+  })
+
+  # Output complete years (after threshold & manual removal)
+  complete_years_Qdaily <- reactive({
+    
+    validate(
+      need(input$stn_id_input, "Invalid Station ID"))
+    
+    validate(
+      need((Qdaily_years()[!(Qdaily_years() %in% input$remove_year_Qdaily)]) > 2,
+           "!!! Insufficient Amount of Complete Year !!!"))
+    
+    Qdaily_years()[!(Qdaily_years() %in% input$remove_year_Qdaily)]
+    
+  })
+  
+  # Render a text sentence for the # of complete years
+  output$complete_years_Qdaily <- renderText({
+
+    paste0("There are <b>", length(complete_years_Qdaily()), "</b> complete years after removal.")
+
+  })
+  
+  selected_months_num <- reactive({
+    
+    validate(
+      need(length(input$months_Qdaily)>0, "Select at least 1 month")
+      )
+    
+    #Convert month abbreviations to numerical values
+    match(input$months_Qdaily, base::month.abb)
+    
+  })
+  
+  # AMS Plot
+  output$daily_ams_fig <- renderPlotly({
+    
+    validate(
+      need((Qdaily_years()[!(Qdaily_years() %in% input$remove_year_Qdaily)]) > 2,
+           "!!! Insufficient Amount of Complete Year !!!"))
+    
+    validate(
+      need(length(input$months_Qdaily)>0, "Select at least 1 month")
+    )
+    
+    empirical_df <- empirical_ffa(flow_df = Qdaily(), 
+                  complete_years = complete_years_Qdaily(), 
+                  selected_months = selected_months_num())
+
+    daily_ams_plot <- ggplot(empirical_df, aes(x = Year, y = AMS)) +
+      geom_point() + theme_bw() +
+      scale_y_continuous(name = "Q (m<sup>3</sup>/s)", limits=c(0, NA)) +
+      scale_x_continuous(name = "Year", limits=c(NA, NA)) +
+      ggtitle("Annual Maximum Series of Daily Flow")
+    
+    ggplotly(daily_ams_plot)
+  })
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
   
 }) # End of ShinyServer(){}
