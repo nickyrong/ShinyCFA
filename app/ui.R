@@ -94,7 +94,7 @@ shinyUI(fluidPage(
                             fluidRow(
                               column(6,
                                      "Select Start of Water Year",
-                                     selectInput("wy_start", "", 
+                                     selectInput("wy_start_hydrograph", "", 
                                                   c("January" = 1, "February" = 2, "March" = 3,
                                                     "April" = 4, "May" = 5, "June" = 6,
                                                     "July" = 7, "August" = 8, "September" = 9,
@@ -113,7 +113,33 @@ shinyUI(fluidPage(
                             br(), 
                             plotOutput("hydrograph"),
                             br()
-                   ) # End of Hydrograph sub-tab
+                   ), # End of Hydrograph sub-tab
+                   
+                   #---- Sub tab: Trend Test
+                   tabPanel("Trends",
+                            br(),
+                            fluidRow(
+                              column(6,
+                                     "Select Start of Water Year",
+                                     selectInput("wy_start_trend", "", 
+                                                 c("January" = 1, "February" = 2, "March" = 3,
+                                                   "April" = 4, "May" = 5, "June" = 6,
+                                                   "July" = 7, "August" = 8, "September" = 9,
+                                                   "October" = 10, "November" = 11, "December" = 12),
+                                                 selected = "January"), p(""),
+                              ),
+                              
+                              column(6 # empty place holder
+                              )
+                            ),# End of fluidRow
+                            
+                            
+                            br(), 
+                            shinycssloaders::withSpinner( 
+                              plotOutput("trend")
+                            ),#End of busy indicator
+                            br()
+                   ) # End of Trend sub-tab
                    
                  ) # End of all sub-tabs
         ), # End of Explore Data tab

@@ -18,6 +18,7 @@ library(FlowScreen)
 
 
 source("./functions.R")
+source("./FlowScreen_hyear_internal_fixed.R")
 
 # ------------ HYDAT database loading ------------
 
@@ -54,6 +55,13 @@ shinyServer(function(input, output, session) {
     
   })
   
+  # Central data processing: read Q daily
+  Qdaily <- reactive({
+    
+    read_dailyflow(input$stn_id_input)
+    
+  })
+  
   # -2- ReadMe Tab --------------------------------------------
   
   # -3- Map Tab -----------------------------------------------
@@ -81,7 +89,7 @@ shinyServer(function(input, output, session) {
   output$tsgraph <- renderDygraph({
     
     # Spread the flow data by the flag
-    TS <- read_dailyflow(station_number = input$stn_id_input) %>%
+    TS <- Qdaily() %>%
       select(Date, Flow, Symbol = SYM)
     codes <- as.factor(TS$Symbol)
     codes <- match(codes, SYMs)
@@ -206,20 +214,39 @@ shinyServer(function(input, output, session) {
   
   output$hydrograph <- renderPlot({
 
-    flow <- read_dailyflow(input$stn_id_input)
-    
-    flow %>%
+    Qdaily() %>%
       # FlowScreen package uses blank to represent "NA"
       mutate(SYM = replace_na(SYM,"")) %>% 
       # Definition of WY changes day of year calculation
-      create.ts(hyrstart = as.numeric(input$wy_start)) %>%
+      create.ts(hyrstart = as.numeric(input$wy_start_hydrograph)) %>%
       
       # Let user define y-axis limit (by % of max value)
       # lims must be defined as c(min, max)
       regime(y.lims = 
-               c(0, as.numeric(input$hydrograph_ylim)/100 * max(flow$Flow, na.rm = TRUE)))
+               c(0, as.numeric(input$hydrograph_ylim)/100 * max(Qdaily()$Flow, na.rm = TRUE)))
       
     
+  })
+  
+  # -7- Trend Tests Tab ---------------------------------------
+  
+  output$trend <- renderPlot({
+    
+    Qdaily_ts <- Qdaily() %>%
+      # FlowScreen package uses blank to represent "NA"
+      mutate(SYM = replace_na(SYM,"")) %>% 
+      # Definition of WY changes day of year calculation
+      FlowScreen::create.ts(hyrstart = as.numeric(input$wy_start_trend))
+    
+    
+    Qdaily_res <- Qdaily_ts %>% FlowScreen::metrics.all()
+    opar <- par(no.readonly = TRUE)
+    layout(matrix(c(1:12), 4, 3, byrow=TRUE))
+    stninfo <- station.info(Qdaily_ts, Plot=TRUE)
+    screen.frames(Qdaily_res, type="h", text=NULL, multi=TRUE)
+    
+    
+
   })
   
   
