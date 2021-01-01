@@ -1,10 +1,10 @@
-### Authors 
+## Authors 
 
 * [Nick Rong](https://github.com/nickyrong)
 * [Nate Smith](https://github.com/WraySmith)
 <br/>
 
-### Overview
+## Overview
 This app allows the user to enter a Water Survey of Canada (WSC) station ID to access the Hydat database:
 [Hydat Database](https://www.canada.ca/en/environment-climate-change/services/water-overview/quantity/monitoring/survey/data-products-services/national-archive-hydat.html)
 <br/><br/>
@@ -17,7 +17,7 @@ Some functionalities in this ShinyApp is provided by [tidyhydat package](https:/
 <br/>
 
 
-### Functionalities:
+## Functionalities:
 Currently the app allows the user to:
 
 - View the locations of Water Survey of Canada (WSC) hydrometric stations (non-searchable map)  
@@ -28,7 +28,7 @@ Currently the app allows the user to:
 
 <br/>
 
-### Frequency Analysis Methods:
+## Frequency Analysis Methods:
 The frequency distribution(s) are fitted using L-moments method from R package [lmom](https://cran.r-project.org/web/packages/lmom/index.html) by J. R. M. Hosking. L-moments of the sample data are calculated. Distribution parameters are then estimated from the calculated L-moments.
 
 Return periods of annual maximum discharge are calculated using the Weibull formula: *Tr = (N+1) / m* where *N* is the sample size and *m* is the rank. Probability of Non-exceedance is the inverse of return period: *P = 1 / Tr*. Frequency distribution plots' x-axis has been transformed into probabilistic scale: *η = −log(−log(P)) = −log[−log(1 − 1/Tr)]* where *η* is the reduced variate.
