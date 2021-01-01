@@ -67,20 +67,6 @@ read_dailyflow <- function(station_number) {
                                          hydat_path = Hydat_Location) %>%
                   filter(Parameter == 'Flow')
   
-  # read Qdaily from real time data
-  # unfortunately WSC Datamart only provides most recent 30-days data
-  # up to 18-month of real time data can be downloaded from WSC website
-  # https://wateroffice.ec.gc.ca/search/real_time_e.html
-  
-  # Second thought...maybe real time data is not worth it...
-  
-  #rt_daily <- realtime_dd(station_number) %>% 
-  #                realtime_daily_mean() %>% 
-  #                filter(Parameter == "Flow") %>%
-  #                select(-PROV_TERR_STATE_LOC) %>%
-  #                mutate(Symbol = "RealTime")
-  
-  #Q_daily <- bind_rows(hy_daily, rt_daily) %>%
   
   Q_daily <- hy_daily %>%
     # put the Qdaily into format readable by FlowScreen Package for potential future use
@@ -91,6 +77,26 @@ read_dailyflow <- function(station_number) {
     
   return(Q_daily)
 } # EOF read_dailyflow
+
+# Instantaneous Time Series
+read_Qinst <- function(station_number) {
+  
+  # read Qinst from HYDAT
+  Q_Inst = tidyhydat::hy_annual_instant_peaks(station_number = station_number, hydat_path = Hydat_Location)
+  
+  
+  # put the QiNST into format readable by FlowScreen Package for potential future use
+  Qinst <- Q_Inst %>%
+    filter(Parameter == 'Flow',
+           PEAK_CODE == 'MAX') %>%
+    
+    # Flow parameter: 1 = Flow, 2 = level
+    mutate(ID = station_number, PARAM = 1, Agency = "WSC") %>%
+    select(ID, PARAM, Date, Flow = Value, SYM = Symbol, Agency)
+  
+  
+  return(Qinst)
+} # EOF read_Qinst
 
 # function to calculate water year base on date
 hydro_yr <- function(., hyrstart) {
@@ -235,7 +241,7 @@ lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
 } # End of Flood Frequency Function
 
 
-
+# calculate empirical frequency
 empirical_ffa <- function(flow_df, complete_years, selected_months){
   
   flow_df %>% 
@@ -250,9 +256,10 @@ empirical_ffa <- function(flow_df, complete_years, selected_months){
     rename(AMS = Flow) %>%
     ungroup() %>%
     mutate(Rank = base::rank(-AMS, ties.method = "random"),
-           Tr = ((length(Rank)+1) / Rank)
+           `Return Period` = round(((length(Rank)+1) / Rank), digits = 3)
     ) %>%
-    arrange(Rank)
+    arrange(Rank) %>%
+    mutate(AMS = round(AMS, digits = 3))
 }
   
   

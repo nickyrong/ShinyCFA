@@ -1,20 +1,20 @@
 rm(list = ls())
-library(shiny)
-library(tidyhydat)
-library(leaflet)
-library(dplyr)
-library(lubridate)
-library(readr)
-library(xts)
-library(dygraphs)
-library(tidyr)
-library(lmom)
-library(plotly)
-library(rlang)
-library(renv)
+library(shiny) #important
+library(tidyhydat) # for downloading/opening HYDAT database
+library(leaflet) # for station map
+library(dplyr) #important
+library(lubridate) # needed to handle datetime
+library(xts) # needed for the time series plotting process
+library(dygraphs) # needed for the time series plotting process
+library(tidyr) # use tidyr instead of tidyverse
+library(lmom) # needed for frequency distribution fitting
+library(plotly) # needed for interactive plots
+library(rlang) #important
+library(renv) # needed for package version control
 library(shinyalert) # for pop-up message in the data removal tab
 library(shinybusy) # busy indicator for rendering plots/tables
-library(FlowScreen)
+library(FlowScreen) # needed for trend test
+library(pastecs) # quick descriptive stats stat.desc()
 
 # -------------- Custom Scripts ------------------
 
@@ -47,6 +47,45 @@ shinyServer(function(input, output, session) {
     
   })
   
+  # HYDAT version query
+  output$HYDAT_version <- renderText({
+    
+    db_ver_date <- tidyhydat::hy_version(hydat_path = Hydat_Location) %>% 
+                    "[["(1,2) %>% base::as.Date()
+    
+    validate(
+      need(
+        http_status(GET('https://collaboration.cmc.ec.gc.ca/cmc/hydrometrics/www/'))$reason == "OK",
+        paste0("HYDAT Databse Ver.: ", db_ver_date, "\n",
+               "(Ver verification failed: cannot connect to WSC)")
+        
+      )
+    )
+    
+    HYDAT_page <- readLines('https://collaboration.cmc.ec.gc.ca/cmc/hydrometrics/www/')
+    sqlite3_line <- HYDAT_page[grep(pattern = "Hydat_sqlite3", x = HYDAT_page)]
+    
+    most_updated_ver <- gsub('^.*Hydat_sqlite3_\\s*|\\s*.zip.*$', '', sqlite3_line) %>% 
+      base::as.Date(format = "%Y%m%d")
+    
+    if (db_ver_date < most_updated_ver) {
+      
+      paste0("HYDAT Databse Ver.: ", db_ver_date, "\n",
+             "<p style='color:red'> (Outdated - Contact App Maintainers) </p>")
+      
+    } else if(db_ver_date == most_updated_ver){
+      
+      paste0("HYDAT Databse Ver.: ", db_ver_date, "\n",
+             "<p style='color:green'> (Up-to-date) </p>")
+      
+    } else{
+      
+      paste0("HYDAT Databse Ver.: ", db_ver_date, "\n",
+             "<p style='color:orange'> (Version Status Unknown) </p>")
+    }
+    
+  })
+  
   # Central data processing: read Q daily
   Qdaily <- reactive({
     
@@ -54,6 +93,16 @@ shinyServer(function(input, output, session) {
       need(input$stn_id_input, "Invalid Station ID"))
     
     read_dailyflow(input$stn_id_input)
+    
+  })
+  
+  # Central data processing: read Q inst
+  Qinst <- reactive({
+    
+    validate(
+      need(input$stn_id_input, "Invalid Station ID"))
+    
+    read_Qinst(input$stn_id_input)
     
   })
   
@@ -249,14 +298,14 @@ shinyServer(function(input, output, session) {
   })
   
   
-  # -8- Frequency Analysis Tab ---------------------------------
+  # -8- Qdaily Frequency Analysis Tab -------------------------
 
   
   # Only keep complete years base on threshold selector
   Qdaily_years <- reactive({
 
     complete_years <- Qdaily() %>%
-      mutate(Year = year(Date)) %>%
+      mutate(Year = lubridate::year(Date)) %>%
       drop_na(Flow) %>%
       group_by(Year) %>%
       count(Year) %>%
@@ -291,10 +340,12 @@ shinyServer(function(input, output, session) {
   # Render a text sentence for the # of complete years
   output$complete_years_Qdaily <- renderText({
 
-    paste0("There are <b>", length(complete_years_Qdaily()), "</b> complete years after removal.")
+    paste0("There are <b>", length(complete_years_Qdaily()), 
+           "</b> complete years after removal.")
 
   })
   
+  # reactive function to prevent an empty selected months
   selected_months_num <- reactive({
     
     validate(
@@ -306,8 +357,8 @@ shinyServer(function(input, output, session) {
     
   })
   
-  # AMS Plot
-  output$daily_ams_fig <- renderPlotly({
+  # Empirical frequency analysis - df needed for plot and table
+  empirical_daily <- reactive({
     
     validate(
       need((Qdaily_years()[!(Qdaily_years() %in% input$remove_year_Qdaily)]) > 2,
@@ -317,30 +368,396 @@ shinyServer(function(input, output, session) {
       need(length(input$months_Qdaily)>0, "Select at least 1 month")
     )
     
-    empirical_df <- empirical_ffa(flow_df = Qdaily(), 
+    empirical_ffa(flow_df = Qdaily(), 
                   complete_years = complete_years_Qdaily(), 
-                  selected_months = selected_months_num())
+                  selected_months = selected_months_num()) %>%
+     
+      rename(`Peak Discharge (cms)` = AMS)
+    
 
-    daily_ams_plot <- ggplot(empirical_df, aes(x = Year, y = AMS)) +
+  })
+  
+  # output simple descriptive statistics about the data
+  output$daily_simplestats <- renderPrint({
+    
+    empirical_daily()$`Peak Discharge (cms)` %>% 
+      stat.desc(basic = TRUE, desc = TRUE, norm = TRUE) %>% 
+      round(digits = 3)
+    
+  })
+  
+  # Empirical frequency figure
+  output$daily_ams_fig <- renderPlotly({
+
+
+    daily_ams_plot <- ggplot(empirical_daily(), aes(x = Year, y = `Peak Discharge (cms)`, 
+                                                    `Return Period` = `Return Period`)) +
       geom_point() + theme_bw() +
-      scale_y_continuous(name = "Q (m<sup>3</sup>/s)", limits=c(0, NA)) +
+      scale_y_continuous(name = "Annual Max Peak Discharge (m<sup>3</sup>/s)", limits=c(0, NA)) +
       scale_x_continuous(name = "Year", limits=c(NA, NA)) +
-      ggtitle("Annual Maximum Series of Daily Flow")
+      ggtitle(paste0(input$stn_id_input, " Daily Flow"))
     
     ggplotly(daily_ams_plot)
   })
   
   
+  # Empirical frequency table
+  output$daily_ams_table <- DT::renderDataTable({
+    
+    formated_df <- empirical_daily() %>%
+      select(ID, Year, Date, `Peak Discharge (cms)`, Rank, `Return Period`, SYM) 
+    
+    formated_df %>% DT::datatable(
+      # Options for data table formatting
+      extensions = c('Buttons', 'FixedColumns'),
+      options = list(
+        
+        columnDefs = list(list(className = "dt-center", targets = "_all")),
+        
+        # Options for extension "FixedColumns"
+        scrollX = TRUE,
+        
+        # Rows
+        lengthMenu = list(c(10, 25, -1), c('10', '25', 'All')),
+        pageLength = 10
+      )
+    )
+  })
+  
+  # Analytical Frequency Distribution
+  
+  # Update available distribution list in the UI
+  updateSelectInput(session, 'daily_selector_dist',
+                    choices = Dist_Options,
+                    selected = "GEV"
+  )
   
   
+  # Analytical frequency distribution - df needed for plot and table
+  analytical_daily <- reactive({
+    
+    validate(
+      need((Qdaily_years()[!(Qdaily_years() %in% input$remove_year_Qdaily)]) > 2,
+           "!!! Insufficient Amount of Complete Year !!!"))
+    
+    validate(
+      need(length(input$months_Qdaily)>0, "Select at least 1 month")
+    )
+    
+    desired_columns <- Dist_Key[match(input$daily_selector_dist, Dist_Options)]
+    
+    if (length(input$daily_selector_Tr) < 1) (
+      ffa_results <- lmom_Q(Qp = empirical_daily()$`Peak Discharge (cms)`) %>%
+        mutate_at(vars(-Pnonexc), round(., 2)) %>%
+        mutate_at(vars(Pnonexc), round(., 6)) %>%
+        select(ReturnPeriods, Pnonexc, !!desired_columns) %>%
+        rename("Return Periods" = ReturnPeriods, "Probability Non-Exc" = Pnonexc)
+      
+    ) else (
+      ffa_results <- lmom_Q(Qp = empirical_daily()$`Peak Discharge (cms)`, 
+                            empirical.Tr = as.integer(input$daily_selector_Tr)) %>%
+        mutate_at(vars(-Pnonexc), list(~round(., 2))) %>%
+        mutate_at(vars(Pnonexc), list(~round(., 6))) %>%
+        select(ReturnPeriods, Pnonexc, !!desired_columns) %>%
+        rename(`Return Period` = ReturnPeriods, "Probability Non-Exc" = Pnonexc)
+    )
+    
+    ffa_results 
+  })
+  
+  output$daily_lmoments <- renderPrint({
+    
+    empirical_daily()$`Peak Discharge (cms)` %>% samlmu(nmom=5)
+    
+  })
   
   
+  # Analytical frequency distribution table
+  output$daily_dist_table <- DT::renderDataTable({
+  
+    
+    analytical_daily() %>% DT::datatable(
+      # Options for data table formatting
+      extensions = c('Buttons', 'FixedColumns'),
+      options = list(
+        
+        # Options for extension "Buttons"
+        dom = 'Bfrtip',
+        
+        buttons = c('copy', 'csv', 'excel', 'pdf'),
+        
+        columnDefs = list(list(className = "dt-center", targets = "_all")),
+        
+        # Options for extension "FixedColumns"
+        scrollX = TRUE,
+        
+        # Options for extension "Scroller"
+        deferRender = TRUE,
+        scroller = TRUE
+      )
+    )
+  })
   
   
-  
-  
-  
+  # Analytical frequency distribution figure
+  output$daily_dist_fig <- renderPlotly({
+
+    desired_columns <- Dist_Key[match(input$daily_selector_dist, Dist_Options)]
+    
+    ffa_results <- lmom_Q(Qp = empirical_daily()$`Peak Discharge (cms)`, evaluation = "Plot") %>%
+      select(-Pnonexc) %>%
+      select(ReturnPeriods, !!desired_columns) %>%
+      rename(`Return Period` = ReturnPeriods)
+    
+    ffa_results <- gather(ffa_results, "Distribution", "Q", -1)
+    
+    ffa_reduced_variate <- -log(-log(1-1/ffa_results$`Return Period`))
+    empirical_reduced_variate <- -log(-log(1-1/empirical_daily()$`Return Period`))
+    
+    if (length(desired_columns) > 0) (
+      
+      ffa_plot <- ggplot(ffa_results) + theme_bw() +
+        
+        # Need return period to be in the pop-up, but ggplot will protest unknown aesthetics, suppress
+        suppressWarnings(geom_line(
+                            aes(x = ffa_reduced_variate, y = Q, 
+                                color = Distribution, Tr = `Return Period`))) +
+        
+        suppressWarnings(geom_point(data = empirical_daily(), 
+                            aes(x = empirical_reduced_variate, y = `Peak Discharge (cms)`, 
+                                colour = "Observed", Tr = `Return Period`))) +
+        
+        scale_x_continuous(name = "Return Periods (Year)", 
+                           breaks =-log(-log(1-1/c(2,5,10,20,50,100,200,500,1000))), 
+                           labels = c(2,5,10,20,50,100,200,500,1000)) +
+        scale_y_continuous(name = "Intantaneous Peak Discharge (m<sup>3</sup>/s)", limits=c(0, NA)) + 
+        
+        ggtitle("L-moments Fitted Frequency Distributions") 
+      
+    )
+    
+    if (length(desired_columns) > 0) (ggplotly(ffa_plot, height = 800, width = 1000))
+  })
   
 
+  
+  # -9- Qinst Frequency Analysis Tab -------------------------
+  
+  # Years that not selected for removal
+  Qinst_years <- reactive({
+    
+    Qinst_y <- Qinst() %>%
+      mutate(Year = lubridate::year(Date)) %>%
+      pull(Year)
+    
+    Qinst_y
+  })
+  
+  # Need to observe years available for removal after input$selector_days
+  observe({
+    # Update Years Available for Removal
+    updateSelectInput(session, 'remove_year_Qinst',
+                      choices = Qinst_years()
+    )
+  })
+  
+  # Output selected years (after manual removal)
+  selected_years_Qinst <- reactive({
+    
+    validate(
+      need(input$stn_id_input, "Invalid Station ID"))
+    
+    validate(
+      need(Qinst_years()[!(Qinst_years() %in% input$remove_year_Qinst)] > 2,
+           "!!! Insufficient Amount of Complete Year !!!"))
+    
+    Qinst_years()[!(Qinst_years() %in% input$remove_year_Qinst)]
+    
+  })
+  
+  # Render a text sentence for the # of complete years
+  output$selected_years_Qinst <- renderText({
+    
+    paste0("There are <b>", length(selected_years_Qinst()), 
+           "</b> years in sample data after removal.")
+    
+  })
+  
+  
+  # Empirical frequency analysis - df needed for plot and table
+  empirical_inst <- reactive({
+    
+    validate(
+      need(Qinst_years()[!(Qinst_years() %in% input$remove_year_Qinst)] > 2,
+           "!!! Insufficient Amount of Sample Data !!!"))
+    
+
+    empirical_ffa(flow_df = Qinst(), 
+                  complete_years = selected_years_Qinst(), 
+                  selected_months = seq(1:12)) %>%
+      
+      rename(`Inst. Peak Discharge (cms)` = AMS)
+    
+    
+  })
+  
+  # output simple descriptive statistics about the data
+  output$inst_simplestats <- renderPrint({
+    
+    empirical_inst()$`Inst. Peak Discharge (cms)` %>% 
+      stat.desc(basic = TRUE, desc = TRUE, norm = TRUE) %>% 
+      round(digits = 3)
+    
+  })
+  
+  # Empirical frequency figure
+  output$inst_ams_fig <- renderPlotly({
+    
+    
+    inst_ams_plot <- ggplot(empirical_inst(), aes(x = Year, y = `Inst. Peak Discharge (cms)`, 
+                                                  `Return Period` = `Return Period`)) +
+      geom_point() + theme_bw() +
+      scale_y_continuous(name = "Annual Max Peak Discharge (m<sup>3</sup>/s)", limits=c(0, NA)) +
+      scale_x_continuous(name = "Year", limits=c(NA, NA)) +
+      ggtitle(paste0(input$stn_id_input, " Instantaneous Peakflow"))
+    
+    ggplotly(inst_ams_plot)
+  })
+  
+  
+  # Empirical frequency table
+  output$inst_ams_table <- DT::renderDataTable({
+    
+    formated_df <- empirical_inst() %>%
+      select(ID, Year, Date, `Inst. Peak Discharge (cms)`, Rank, `Return Period`, SYM) 
+    
+    formated_df %>% DT::datatable(
+      # Options for data table formatting
+      extensions = c('Buttons', 'FixedColumns'),
+      options = list(
+        
+        columnDefs = list(list(className = "dt-center", targets = "_all")),
+        
+        # Options for extension "FixedColumns"
+        scrollX = TRUE,
+        
+        # Rows
+        lengthMenu = list(c(10, 25, -1), c('10', '25', 'All')),
+        pageLength = 10
+      )
+    )
+  })
+  
+  # Analytical Frequency Distribution
+  
+  # Update available distribution list in the UI
+  updateSelectInput(session, 'inst_selector_dist',
+                    choices = Dist_Options,
+                    selected = "GEV"
+  )
+  
+  
+  # Analytical frequency distribution - df needed for plot and table
+  analytical_inst <- reactive({
+    
+    validate(
+      need(Qinst_years()[!(Qinst_years() %in% input$remove_year_Qinst)] > 2,
+           "!!! Insufficient Amount of Sample Data !!!"))
+    
+
+    desired_columns <- Dist_Key[match(input$inst_selector_dist, Dist_Options)]
+    
+    if (length(input$inst_selector_Tr) < 1) (
+      ffa_results <- lmom_Q(Qp = empirical_inst()$`Inst. Peak Discharge (cms)`) %>%
+        mutate_at(vars(-Pnonexc), round(., 2)) %>%
+        mutate_at(vars(Pnonexc), round(., 6)) %>%
+        select(ReturnPeriods, Pnonexc, !!desired_columns) %>%
+        rename("Return Periods" = ReturnPeriods, "Probability Non-Exc" = Pnonexc)
+      
+    ) else (
+      ffa_results <- lmom_Q(Qp = empirical_inst()$`Inst. Peak Discharge (cms)`, 
+                            empirical.Tr = as.integer(input$inst_selector_Tr)) %>%
+        mutate_at(vars(-Pnonexc), list(~round(., 2))) %>%
+        mutate_at(vars(Pnonexc), list(~round(., 6))) %>%
+        select(ReturnPeriods, Pnonexc, !!desired_columns) %>%
+        rename(`Return Period` = ReturnPeriods, "Probability Non-Exc" = Pnonexc)
+    )
+    
+    ffa_results 
+  })
+  
+  output$inst_lmoments <- renderPrint({
+    
+    empirical_inst()$`Inst. Peak Discharge (cms)` %>% samlmu(nmom=5)
+    
+  })
+  
+  
+  # Analytical frequency distribution table
+  output$inst_dist_table <- DT::renderDataTable({
+    
+    
+    analytical_inst() %>% DT::datatable(
+      # Options for data table formatting
+      extensions = c('Buttons', 'FixedColumns'),
+      options = list(
+        
+        # Options for extension "Buttons"
+        dom = 'Bfrtip',
+        
+        buttons = c('copy', 'csv', 'excel', 'pdf'),
+        
+        columnDefs = list(list(className = "dt-center", targets = "_all")),
+        
+        # Options for extension "FixedColumns"
+        scrollX = TRUE,
+        
+        # Options for extension "Scroller"
+        deferRender = TRUE,
+        scroller = TRUE
+      )
+    )
+  })
+  
+  
+  # Analytical frequency distribution figure
+  output$inst_dist_fig <- renderPlotly({
+    
+    desired_columns <- Dist_Key[match(input$inst_selector_dist, Dist_Options)]
+    
+    ffa_results <- lmom_Q(Qp = empirical_inst()$`Inst. Peak Discharge (cms)`, evaluation = "Plot") %>%
+      select(-Pnonexc) %>%
+      select(ReturnPeriods, !!desired_columns) %>%
+      rename(`Return Period` = ReturnPeriods)
+    
+    ffa_results <- gather(ffa_results, "Distribution", "Q", -1)
+    
+    ffa_reduced_variate <- -log(-log(1-1/ffa_results$`Return Period`))
+    empirical_reduced_variate <- -log(-log(1-1/empirical_inst()$`Return Period`))
+    
+    if (length(desired_columns) > 0) (
+      
+      ffa_plot <- ggplot(ffa_results) + theme_bw() +
+        
+        # Need return period to be in the pop-up, but ggplot will protest unknown aesthetics, suppress
+        suppressWarnings(geom_line(
+          aes(x = ffa_reduced_variate, y = Q, 
+              color = Distribution, Tr = `Return Period`))) +
+        
+        suppressWarnings(geom_point(data = empirical_inst(), 
+                                    aes(x = empirical_reduced_variate, y = `Inst. Peak Discharge (cms)`, 
+                                        colour = "Observed", Tr = `Return Period`))) +
+        
+        scale_x_continuous(name = "Return Periods (Year)", breaks =-log(-log(1-1/c(2,5,10,20,50,100,200,500,1000))), 
+                           labels = c(2,5,10,20,50,100,200,500,1000)) +
+        scale_y_continuous(name = "Peak Discharge (m<sup>3</sup>/s)", limits=c(0, NA)) + 
+        
+        ggtitle("L-moments Fitted Frequency Distributions") 
+      
+    )
+    
+    if (length(desired_columns) > 0) (ggplotly(ffa_plot, height = 800, width = 1000))
+  })
+  
   
 }) # End of ShinyServer(){}

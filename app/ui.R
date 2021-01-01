@@ -8,7 +8,9 @@ library(shinycssloaders) # withSpinner() indicate calculation/rendering in progr
 library(shinythemes)
 library(shinyalert) # for pop-up message in the data removal tab
 
+
 options(shiny.sanitize.errors = TRUE)
+linebreaks <- function(n){HTML(strrep(br(), n))}
 
 # Define UI
 shinyUI(fluidPage(
@@ -28,11 +30,17 @@ shinyUI(fluidPage(
   # SideBar UI configuration
   pageWithSidebar(
     
-    headerPanel('Hydrometric Data Tool for WSC HYDAT'),
+    headerPanel(title=div("Hydrometric Data Tool for WSC HYDAT", 
+                          img(src='', 
+                              style = "float:right;"
+                          )
+    )
+  ),
+
     
     sidebarPanel(
       width = 3,
-      h5("Placeholder for HYDAT Version"),
+      h6(htmlOutput('HYDAT_version')),
       br(), 
       # https://shiny.rstudio.com/articles/selectize.html
       selectizeInput("stn_id_input", label = h3("WSC Station ID"), selected = "08GA010",
@@ -165,6 +173,7 @@ shinyUI(fluidPage(
                    tabPanel("Daily Q",
                             br(),
                             
+                            h2('1. Settings'),
                             fluidRow(
                               column(4,
                                      selectizeInput("remove_year_Qdaily", "Select Years to Remove", 
@@ -187,14 +196,93 @@ shinyUI(fluidPage(
                             ), # End of FluidRow
                             
                             htmlOutput("complete_years_Qdaily"),
+                            h5('Water year is not in effect because water vs calendar year 
+                               have minimum effects on annual max series.'),
+                            br(),
                             
+                            h2('2. Empirical Frequency'),
+                            h5("Descriptive Statistics (pastecs::stat.desc):"),
+                            verbatimTextOutput("daily_simplestats", placeholder = FALSE),
+                            br(),
+                            DT::dataTableOutput("daily_ams_table"),
                             br(),
                             plotlyOutput("daily_ams_fig"),
+                            br(),
                             
+                            h2('3. Analytical Frequency Distribution'),
+                            fluidRow(
+                              column(6,
+                                     selectizeInput('daily_selector_dist', 'Select Distributions',
+                                                    choices = NULL, multiple = TRUE)),
+                              column(6,
+                                     selectizeInput('daily_selector_Tr', 'Select Return Periods (Years)',
+                                                    choices = c(2, 5, 10, 20, 25, 30, 40, 50, 
+                                                                75, 100, 200, 250, 300,
+                                                                400, 500, 1000, 2500, 10000), 
+                                                    multiple = TRUE,
+                                                    options = list(maxItems = 10), selected = 2))
+                              ),
+                            h5("Sampled Linear Moments & Ratios (lmom::samlmu):"),
+                            verbatimTextOutput("daily_lmoments", placeholder = FALSE),
+                            DT::dataTableOutput("daily_dist_table"),
+                            br(),
+                            plotlyOutput("daily_dist_fig"),
+                            
+                            linebreaks(30)
+
                    ), # End of Q daily Frequency sub-tab
                    
                    #---- Sub tab: Frequency Distribution
-                   tabPanel("Instantaneous Q"
+                   tabPanel("Instantaneous Q",
+                            br(),
+                            
+                            h2('1. Settings'),
+                            fluidRow(
+                              column(4,
+                                     selectizeInput("remove_year_Qinst", "Select Years to Remove", 
+                                                    selected = NULL,
+                                                    choices = NULL,
+                                                    multiple= TRUE
+                                     )
+                              ),
+                              column(4 #placeholder
+                              ),
+                              column(4 #placeholder
+                              )
+                            ), # End of FluidRow
+                            htmlOutput("selected_years_Qinst"),
+                            br(),
+                            
+                            h2('2. Empirical Frequency'),
+                            h5("Descriptive Statistics (pastecs::stat.desc):"),
+                            verbatimTextOutput("inst_simplestats", placeholder = FALSE),
+                            br(),
+                            DT::dataTableOutput("inst_ams_table"),
+                            br(),
+                            plotlyOutput("inst_ams_fig"),
+                            br(),
+                            
+                            h2('3. Analytical Frequency Distribution'),
+                            fluidRow(
+                              column(6,
+                                     selectizeInput('inst_selector_dist', 'Select Distributions',
+                                                    choices = NULL, multiple = TRUE)),
+                              column(6,
+                                     selectizeInput('inst_selector_Tr', 'Select Return Periods (Years)',
+                                                    choices = c(2, 5, 10, 20, 25, 30, 40, 50, 
+                                                                75, 100, 200, 250, 300,
+                                                                400, 500, 1000, 2500, 10000), 
+                                                    multiple = TRUE,
+                                                    options = list(maxItems = 10), selected = 2))
+                            ),
+                            h5("Sampled Linear Moments & Ratios (lmom::samlmu):"),
+                            verbatimTextOutput("inst_lmoments", placeholder = FALSE),
+                            DT::dataTableOutput("inst_dist_table"),
+                            br(),
+                            plotlyOutput("inst_dist_fig"),
+                            
+                            linebreaks(30)
+
                    ) # End of Q Inst sub-tab
                    
 

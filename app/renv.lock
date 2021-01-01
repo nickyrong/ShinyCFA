@@ -30,6 +30,20 @@
       "Repository": "CRAN",
       "Hash": "acac794cc3e393ca65f916e5ced5c1d2"
     },
+    "FlowScreen": {
+      "Package": "FlowScreen",
+      "Version": "1.2.6",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "a6529d9f9a62501c8884b4d6de4e8e39"
+    },
+    "Kendall": {
+      "Package": "Kendall",
+      "Version": "2.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "33cab08326760148faef1435b22dd7fb"
+    },
     "MASS": {
       "Package": "MASS",
       "Version": "7.3-53",
@@ -39,10 +53,10 @@
     },
     "Matrix": {
       "Package": "Matrix",
-      "Version": "1.3-0",
+      "Version": "1.2-18",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "a308a28fe951c437957ffe20c84e6b66"
+      "Hash": "08588806cba69f04797dab50627428ed"
     },
     "R6": {
       "Package": "R6",
@@ -121,6 +135,13 @@
       "Repository": "CRAN",
       "Hash": "9addc7e2c5954eca5719928131fed98c"
     },
+    "boot": {
+      "Package": "boot",
+      "Version": "1.3-25",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "bd51734a754b6c2baf28b2d1ebc11e91"
+    },
     "brio": {
       "Package": "brio",
       "Version": "1.1.0",
@@ -148,6 +169,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "f61dbaec772ccd2e17705c1e872e9e7c"
+    },
+    "changepoint": {
+      "Package": "changepoint",
+      "Version": "2.2.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "cb66156ed4155299e65bf06a6c6f60b3"
     },
     "cli": {
       "Package": "cli",
@@ -267,6 +295,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "ec8ca05cffcc70569eaaad8469d2a3a7"
+    },
+    "evir": {
+      "Package": "evir",
+      "Version": "1.7-4",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "b71acac173ada5b81732ce36e2226002"
     },
     "fansi": {
       "Package": "fansi",
@@ -540,6 +575,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "a399e4773075fc2375b71f45fca186c4"
+    },
+    "pastecs": {
+      "Package": "pastecs",
+      "Version": "1.3.21",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "1e5a2671af32dc48c40885aa91fa3bdd"
     },
     "pillar": {
       "Package": "pillar",
@@ -960,6 +1002,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "c2ea03282caa1f6972dc84fc5bf671cc"
+    },
+    "zyp": {
+      "Package": "zyp",
+      "Version": "0.10-1.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "600af9962139fe7b6dde08884024b8a1"
     }
   }
 }
