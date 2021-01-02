@@ -4,9 +4,8 @@ library(leaflet)
 library(dygraphs)
 library(plotly)
 library(renv)
-library(shinycssloaders) # withSpinner() indicate calculation/rendering in progress
-library(shinythemes)
-library(shinyalert) # for pop-up message in the data removal tab
+library(shinycssloaders) # withSpinner() indicate calculation/rendering
+library(shinythemes) 
 
 
 options(shiny.sanitize.errors = TRUE)
@@ -42,13 +41,13 @@ shinyUI(fluidPage(
     sidebarPanel(
       width = 3,
       h6(htmlOutput('HYDAT_version')),
-      br(), 
+
       # https://shiny.rstudio.com/articles/selectize.html
       selectizeInput("stn_id_input", label = h3("WSC Station ID"),
                      choices = NULL,
                      multiple= FALSE,
                      options = list(maxOptions = 5)),
-      br(),
+      
       selectInput("wy_start", h3("Start of Water Year"), 
                   c("January" = 1, "February" = 2, "March" = 3,
                     "April" = 4, "May" = 5, "June" = 6,
@@ -88,7 +87,7 @@ shinyUI(fluidPage(
                             fluidRow(
                               column(3,
                                      selectInput("sum_period", 
-                                                 h4("Select Daily, Monthly, or Yearly Resolution"),
+                                                 h4("Select Daily, Monthly, or Yearly Summary"),
                                                  c("Daily" = "Daily", 
                                                    "Monthly" = "Monthly", 
                                                    "Yearly" = "Yearly"),
@@ -97,7 +96,7 @@ shinyUI(fluidPage(
                               ),
                               
                               column(3, 
-                                     downloadButton("downloadSummary", "Download Summary Data")
+                                     downloadButton("downloadSummary", "Download Summary")
                               ),
                               column(3 #empty placeholder
                                      
@@ -121,12 +120,14 @@ shinyUI(fluidPage(
                    #---- Sub tab: Time Series
                    tabPanel("Time Series",
                             br(),
+                            "This is an interactive graph: drag to zoom in and double click to zoom out",
+                            br(),
                             h3("Daily Average Discharge Data"),
                             shinycssloaders::withSpinner(
                               dygraphOutput(outputId = "tsgraph", height = "600px")
                             ),
-                            br(),
-                            "This is an interactive graph: drag to zoom in and double click to zoom out"
+                            br()
+                            
                    ), # End of Time Series sub-tab
                    
                    
@@ -149,17 +150,17 @@ shinyUI(fluidPage(
                             br(), 
                             plotOutput("hydrograph"),
                             br()
-                   ), # End of Hydrograph sub-tab
+                   ) # End of Hydrograph sub-tab
                    
                    #---- Sub tab: Trend Test
-                   tabPanel("Trends",
-                            
-                            br(), 
-                            shinycssloaders::withSpinner( 
-                              plotOutput("trends")
-                            ),#End of busy indicator
-                            br()
-                   ) # End of Trend sub-tab
+                   # tabPanel("Trends",
+                   #          "Trend analysis provided by the [FlowScreen Package](https://cran.r-project.org/web/packages/FlowScreen/index.html)",
+                   #          br(), 
+                   #          shinycssloaders::withSpinner( 
+                   #            plotOutput("trends")
+                   #          ),#End of busy indicator
+                   #          br()
+                   # ) # End of Trend sub-tab
                    
                  ) # End of all sub-tabs
         ), # End of Explore Data tab
@@ -174,7 +175,7 @@ shinyUI(fluidPage(
                    #---- Sub tab: Qdaily
                    tabPanel("Daily Q",
                             br(),
-                            
+                            h4('Frequency analysis is currently only performed using calendar year'),
                             h2('1. Settings'),
                             fluidRow(
                               column(4,
@@ -189,7 +190,7 @@ shinyUI(fluidPage(
                                          min = 0, max = 365, value = 355)
                               ),
                               column(4, 
-                                     selectizeInput("months_Qdaily", "Select Month of Year", 
+                                     selectizeInput("months_Qdaily", "Select Months to Include", 
                                                     selected = base::month.abb,
                                                     choices = base::month.abb,
                                                     multiple= TRUE
@@ -198,8 +199,7 @@ shinyUI(fluidPage(
                             ), # End of FluidRow
                             
                             htmlOutput("complete_years_Qdaily"),
-                            h5('Water year is not in effect because water vs calendar year 
-                               have minimum effects on annual max series.'),
+          
                             br(),
                             
                             h2('2. Empirical Frequency'),
@@ -237,7 +237,7 @@ shinyUI(fluidPage(
                    #---- Sub tab: Frequency Distribution
                    tabPanel("Instantaneous Q",
                             br(),
-                            
+                            h4('Frequency analysis is currently only performed using calendar year'),
                             h2('1. Settings'),
                             fluidRow(
                               column(4,

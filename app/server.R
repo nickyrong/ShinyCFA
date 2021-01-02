@@ -2,18 +2,17 @@ rm(list = ls())
 library(shiny) #important
 library(tidyhydat) # for downloading/opening HYDAT database
 library(leaflet) # for station map
-library(dplyr) #important
-library(lubridate) # needed to handle datetime
-library(xts) # needed for the time series plotting process
-library(dygraphs) # needed for the time series plotting process
-library(tidyr) # use tidyr instead of tidyverse
-library(lmom) # needed for frequency distribution fitting
-library(plotly) # needed for interactive plots
-library(rlang) #important
-library(renv) # needed for package version control
-library(shinyalert) # for pop-up message in the data removal tab
+library(dplyr) # data manipulation
+library(lubridate) # datetime support
+library(xts) # required for time series plotting
+library(dygraphs) # interactive timeseries plot
+library(tidyr) # data manipulation
+library(lmom) # frequency distribution fitting
+library(plotly) # interactive plots
+library(rlang) # distribution error handling
+library(renv) # package version control
 library(shinybusy) # busy indicator for rendering plots/tables
-library(FlowScreen) # needed for trend test
+library(FlowScreen) # hydrograph and trend test functionality
 library(pastecs) # quick descriptive stats stat.desc()
 library(httr) #http_status() to check HYDAT version
 
@@ -30,29 +29,11 @@ shinyServer(function(input, output, session) {
   
   # -1- SideBar UI --------------------------------------------
   
-  # Station ID Selection by User
-  updateSelectInput(session, 'stn_id_input',
-                    choices = tidyhydat::allstations$STATION_NUMBER,
-                    selected = "08GA031"
-  )
-  
-  output$stn_input_info <- renderText({
-    
-    validate(
-      need(input$stn_id_input, "Invalid Station ID"))
-    
-    # Return Station Name & Info
-    map_data %>% filter(STATION_NUMBER == input$stn_id_input) %>%
-      select(text) %>% as.character()
-    
-    
-  })
-  
   # HYDAT version query
   output$HYDAT_version <- renderText({
     
     db_ver_date <- tidyhydat::hy_version(hydat_path = Hydat_Location) %>% 
-                    "[["(1,2) %>% base::as.Date()
+      "[["(1,2) %>% base::as.Date() #*
     
     validate(
       need(
@@ -84,6 +65,24 @@ shinyServer(function(input, output, session) {
       paste0("HYDAT Databse Ver.: ", db_ver_date, "\n",
              "<p style='color:orange'> (Version Status Unknown) </p>")
     }
+    
+  })
+  
+  # Station ID Selection by User
+  updateSelectInput(session, 'stn_id_input',
+                    choices = tidyhydat::allstations$STATION_NUMBER,
+                    selected = "08MH147"
+  )
+  
+  output$stn_input_info <- renderText({
+    
+    validate(
+      need(input$stn_id_input, "Invalid Station ID"))
+    
+    # Return Station Name & Info
+    map_data %>% filter(STATION_NUMBER == input$stn_id_input) %>%
+      select(text) %>% as.character()
+    
     
   })
   
@@ -144,8 +143,63 @@ shinyServer(function(input, output, session) {
       addMarkers(~LONGITUDE, ~LATITUDE, popup = ~text, clusterOptions = markerClusterOptions())
   })
   
+  # -4- Data Summary Tab ---------------------------------------
+  
+  # the summarized data are needed in both table rendering and download button
+  summarized <- reactive({
+    
+    validate(
+      need(input$stn_id_input, "Invalid Station ID"))
+    
+    data <- Dataset_Summarize(station_number = input$stn_id_input,
+                              summary_reso = input$sum_period,
+                              wy_month = as.numeric(input$wy_start))
+    
+    data # return data
+    
+  })
+  
+  output$table <- DT::renderDataTable({
+    
+    summarized()%>% 
+      
+      DT::datatable(
+        # Data table formatting options
+        extensions = c('Buttons', 'FixedColumns', 'Scroller'),
+        options = list(
+          
+          # Options for extension "Buttons"
+          dom = 'Bfrtip',
+          
+          buttons = list(I('colvis')),
+          
+          columnDefs = list(list(className = "dt-center", targets = "_all")),
+          
+          # Options for extension "FixedColumns"
+          scrollX = TRUE,
+          fixedColumns = TRUE,
+          
+          # Options for extension "Scroller"
+          deferRender = TRUE,
+          scrollY = 600,
+          scroller = TRUE
+        )
+      )
+    
+  })# end of summary table render block
+  
+  # Summarized Data Download button
+  output$downloadSummary <- downloadHandler(
+    filename = function() {
+      paste0(input$stn_id_input,"_", input$sum_period, ".csv")
+    },
+    content = function(file) {
+      write.csv(summarized(), file, row.names = FALSE)
+    }
+  ) # End of csv file download
+  
 
-  # -4- Time Series Tab ---------------------------------------
+  # -5- Time Series Tab ---------------------------------------
 
   ### Plot an interactive graph
   output$tsgraph <- renderDygraph({
@@ -218,64 +272,6 @@ shinyServer(function(input, output, session) {
   }) # End of interactive graph
   
   
-  
-
-  # -5- Data Summary Tab ---------------------------------------
-  
-  # the summrized data are needed in both table rendering and download button
-  summarized <- reactive({
-    
-    validate(
-      need(input$stn_id_input, "Invalid Station ID"))
-    
-    data <- Dataset_Summarize(station_number = input$stn_id_input,
-                              summary_period = input$sum_period,
-                              wy_month = as.numeric(input$wy_start))
-    
-    data # return data
-    
-  })
-  
-  output$table <- DT::renderDataTable({
-    
-     summarized()%>% 
-      
-      DT::datatable(
-      # Data table formatting options
-      extensions = c('Buttons', 'FixedColumns', 'Scroller'),
-      options = list(
-        
-        # Options for extension "Buttons"
-        dom = 'Bfrtip',
-        
-        buttons = list(I('colvis')),
-        
-        columnDefs = list(list(className = "dt-center", targets = "_all")),
-        
-        # Options for extension "FixedColumns"
-        scrollX = TRUE,
-        fixedColumns = TRUE,
-        
-        # Options for extension "Scroller"
-        deferRender = TRUE,
-        scrollY = 600,
-        scroller = TRUE
-      )
-    )
-    
-  })# end of summary table render block
-  
-  # Summarized Data Download button
-  output$downloadSummary <- downloadHandler(
-    filename = function() {
-      paste0(input$stn_id_input,"_", input$sum_period, ".csv")
-    },
-    content = function(file) {
-      write.csv(summarized(), file, row.names = FALSE)
-    }
-  ) # End of csv file download
-  
-  
   # -6- Hydrograph Tab ---------------------------------------
   
   output$hydrograph <- renderPlot({
@@ -296,24 +292,24 @@ shinyServer(function(input, output, session) {
   
   # -7- Trend Tests Tab ---------------------------------------
   
-  output$trends <- renderPlot({
-    
-    Qdaily_ts <- Qdaily() %>%
-      # FlowScreen package uses blank to represent "NA"
-      mutate(SYM = replace_na(SYM,"")) %>% 
-      # Definition of WY changes day of year calculation
-      FlowScreen::create.ts(hyrstart = as.numeric(input$wy_start))
-    
-    
-    Qdaily_res <- Qdaily_ts %>% FlowScreen::metrics.all()
-    opar <- par(no.readonly = TRUE)
-    layout(matrix(c(1:12), 4, 3, byrow=TRUE))
-    stninfo <- station.info(Qdaily_ts, Plot=TRUE)
-    screen.frames(Qdaily_res, type="h", text=NULL, multi=TRUE)
-    
-    
-
-  })
+  # output$trends <- renderPlot({
+  #   
+  #   Qdaily_ts <- Qdaily() %>%
+  #     # FlowScreen package uses blank to represent "NA"
+  #     mutate(SYM = replace_na(SYM,"")) %>% 
+  #     # Definition of WY changes day of year calculation
+  #     FlowScreen::create.ts(hyrstart = as.numeric(input$wy_start))
+  #   
+  #   
+  #   Qdaily_res <- Qdaily_ts %>% FlowScreen::metrics.all()
+  #   opar <- par(no.readonly = TRUE)
+  #   layout(matrix(c(1:12), 4, 3, byrow=TRUE))
+  #   stninfo <- station.info(Qdaily_ts, Plot=TRUE)
+  #   screen.frames(Qdaily_res, type="h", text=NULL, multi=TRUE)
+  #   
+  #   
+  # 
+  # })
   
   
   # -8- Qdaily Frequency Analysis Tab -------------------------
@@ -462,7 +458,7 @@ shinyServer(function(input, output, session) {
       need(length(input$months_Qdaily)>0, "Select at least 1 month")
     )
     
-    desired_columns <- Dist_Key[match(input$daily_selector_dist, Dist_Options)]
+    desired_columns <- Dist_Options[match(input$daily_selector_dist, Dist_Options)]
     
     if (length(input$daily_selector_Tr) < 1) (
       ffa_results <- lmom_Q(Qp = empirical_daily()$`Peak Discharge (cms)`) %>%
@@ -741,7 +737,7 @@ shinyServer(function(input, output, session) {
   # Analytical frequency distribution figure
   output$inst_dist_fig <- renderPlotly({
     
-    desired_columns <- Dist_Key[match(input$inst_selector_dist, Dist_Options)]
+    desired_columns <- Dist_Options[match(input$inst_selector_dist, Dist_Options)]
     
     ffa_results <- lmom_Q(Qp = empirical_inst()$`Inst. Peak Discharge (cms)`, evaluation = "Plot") %>%
       select(-Pnonexc) %>%

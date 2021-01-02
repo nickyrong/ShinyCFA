@@ -2,8 +2,10 @@
 # ------------ HYDAT database loading ------------
 
 # Determine Hydat database location
-if(file.exists("../../database/Hydat.sqlite3")) {
-  Hydat_Location <- "../../database/Hydat.sqlite3"
+if(file.exists("./database/Hydat.sqlite3")) {
+  Hydat_Location <- "./database/Hydat.sqlite3"
+} else if (file.exists("../../database/Hydat.sqlite3")) {
+    Hydat_Location <- "../../database/Hydat.sqlite3"
 } else {
   Hydat_Location <- tidyhydat::hy_default_db()
 }
@@ -17,8 +19,6 @@ SYMcol <- c("grey", "#E41A1C", "#4DAF4A", "#377EB8", "#FF7F00", "#984EA3", "#FFA
 # Distributions List for Flood Frequency Analyis (FFA)
 Dist_Options <- c("Exponential", "Gamma", "GEV", "Gen. Logistic", "Gen. Normal", "Gen. Pareto",
                   "Gumbel", "Kappa", "Normal", "Pearson III", "Wakeby", "Weibull", "Log-Normal", "LP3")
-
-Dist_Key <- Dist_Options
 
 # Generate the data for the map by calling coordinates, labels, and date ranges from the HYDAT database
 range.df <-  tidyhydat::hy_stn_data_range(hydat_path = Hydat_Location) %>%
@@ -69,7 +69,7 @@ read_dailyflow <- function(station_number) {
   
   
   Q_daily <- hy_daily %>%
-    # put the Qdaily into format readable by FlowScreen Package for potential future use
+    # put the Qdaily into format readable by FlowScreen Package
     # Flow parameter: 1 = Flow, 2 = level
     mutate(ID = station_number, PARAM = 1, Agency = "WSC") %>%
     select(ID, PARAM, Date, Flow = Value, SYM = Symbol, Agency)
@@ -82,10 +82,11 @@ read_dailyflow <- function(station_number) {
 read_Qinst <- function(station_number) {
   
   # read Qinst from HYDAT
-  Q_Inst = tidyhydat::hy_annual_instant_peaks(station_number = station_number, hydat_path = Hydat_Location)
+  Q_Inst = tidyhydat::hy_annual_instant_peaks(station_number = station_number, 
+                                              hydat_path = Hydat_Location)
   
   
-  # put the QiNST into format readable by FlowScreen Package for potential future use
+  # put the QiNST into format readable by FlowScreen Package if required
   Qinst <- Q_Inst %>%
     filter(Parameter == 'Flow',
            PEAK_CODE == 'MAX') %>%
@@ -105,7 +106,7 @@ hydro_yr <- function(., hyrstart) {
   d1 = base::as.Date(.)
   
   df <- tibble(Year = lubridate::year(d1),
-               Wyear = Year, #initial set-up
+               WaterYear = Year, #initial set-up
                Month = lubridate::month(d1)
                    )
 
@@ -113,7 +114,7 @@ hydro_yr <- function(., hyrstart) {
   if (hyrstart > 6.5) {
     
     MonthsUp <- c(hyrstart:12)
-    df$Wyear <- base::ifelse(df$Month %in% MonthsUp, df$Year+1, df$Year)
+    df$WaterYear <- base::ifelse(df$Month %in% MonthsUp, df$Year+1, df$Year)
 
   } else if (hyrstart == 1) {
     
@@ -122,17 +123,17 @@ hydro_yr <- function(., hyrstart) {
   } else if (hyrstart < 6.5) {
     
     MonthsDown <- c(1:(hyrstart-1))
-    df$Wyear <- base::ifelse(df$Month %in% MonthsDown, df$Year-1, df$Year)
+    df$WaterYear <- base::ifelse(df$Month %in% MonthsDown, df$Year-1, df$Year)
     
   }
   
   # Return the water year
-  return(df$Wyear)
+  return(df$WaterYear)
 }
 
 # Station Dataset Summarized
 # Uses user input from the resolution dropdown
-Dataset_Summarize <- function(station_number, summary_period, wy_month) {
+Dataset_Summarize <- function(station_number, summary_reso, wy_month) {
   
   TS <- read_dailyflow(station_number = station_number) %>%
     mutate(Year = year(Date) , Month = month(Date), Day = day(Date)) %>%
@@ -146,32 +147,34 @@ Dataset_Summarize <- function(station_number, summary_period, wy_month) {
   # Calculate Water Year
   TS <- TS %>% 
         # calculate water year
-        mutate(WYear = hydro_yr(Date, hyrstart = wy_month),
+        mutate(WaterYear = hydro_yr(Date, hyrstart = wy_month),
                Flag = codes) %>% 
     
-        # re-arrange column order to have WYear beside Year
-        dplyr::relocate(WYear, .after = Year) %>%
+        # re-arrange column order to have WaterYear beside Year
+        dplyr::relocate(WaterYear, .after = Year) %>%
         # Remove Symbol (using Flag instead)
         select(-Symbol) 
   
-  if(summary_period == "Daily"){
+  if(summary_reso == "Daily"){
     TS$Flow_cms <- round(TS$Flow_cms, digits = 3)
   }
   
-  else if(summary_period == "Monthly"){
+  else if(summary_reso == "Monthly"){
     TS <- TS %>% 
             group_by(Year, Month) %>%
             summarise(Average_Flow_cms = mean(Flow_cms, na.rm = TRUE), 
                       Count = sum(is.na(Flow_cms)==FALSE),
-                      .groups = "drop")
+                      WaterYear = max(WaterYear, na.rm = TRUE),
+                      .groups = "drop") %>% 
+            dplyr::relocate(WaterYear, .after = Year)
     
     TS$Average_Flow_cms <- round(TS$Average_Flow_cms, digits = 3)
   }
   
   # Make sure to group by water year
-  else if(summary_period == "Yearly"){
+  else if(summary_reso == "Yearly"){
     TS <- TS %>% 
-      group_by(WYear) %>%
+      group_by(WaterYear) %>%
       summarise(Average_Flow_cms = mean(Flow_cms, na.rm = TRUE), 
                 Max_Daily_cms = max(Flow_cms, na.rm = TRUE),
                 Min_Daily_cms = min(Flow_cms, na.rm = TRUE), 
@@ -182,8 +185,6 @@ Dataset_Summarize <- function(station_number, summary_period, wy_month) {
 
   return(TS)
 } # EOF for flow period summary
-
-
 
 
 
@@ -210,21 +211,45 @@ lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
   log.lmoms <- samlmu(log10(Qp),nmom = 5)
   
   error_value <- as.numeric(rep(NA, length(Pnonexc)))
-  # using tryCatch to allow the app to continue running if a particular distibution can't be fit to the data
+  # using tryCatch to allow the app to continue running 
+  # if a particular distribution can't be fit to the data
   extremes <- tibble(ReturnPeriods = ReturnPeriods,
                      Pnonexc = Pnonexc,
-                     Exponential = tryCatch(error = function(err) {return(error_value)}, quaexp(f = Pnonexc, para = pelexp(lmoms))), # exponential
-                     Gamma = tryCatch(error = function(err) {return(error_value)}, quagam(f = Pnonexc, para = pelgam(lmoms))), # gamma
-                     GEV = tryCatch(error = function(err) {return(error_value)}, quagev(f = Pnonexc, para = pelgev(lmoms))), # generalized extreme-value
-                     `Gen. Logistic` = tryCatch(error = function(err) {return(error_value)}, quaglo(f = Pnonexc, para = pelglo(lmoms))), # generalized logistic
-                     `Gen. Normal` = tryCatch(error = function(err) {return(error_value)}, quagno(f = Pnonexc, para = pelgno(lmoms))), # generalized normal
-                     `Gen. Pareto` = tryCatch(error = function(err) {return(error_value)}, quagpa(f = Pnonexc, para = pelgpa(lmoms))), # generalized pareto
-                     Gumbel = tryCatch(error = function(err) {return(error_value)}, quagum(f = Pnonexc, para = pelgum(lmoms))), # gumbel (extreme value type I)
-                     Kappa = tryCatch(error = function(err) {return(error_value)}, quakap(f = Pnonexc, para = pelkap(lmoms))), # kappa
-                     Normal = tryCatch(error = function(err) {return(error_value)}, quanor(f = Pnonexc, para = pelnor(lmoms))), # normal
-                     `Pearson III` = tryCatch(error = function(err) {return(error_value)}, quape3(f = Pnonexc, para = pelpe3(lmoms))), # pearson type III
-                     Wakeby = tryCatch(error = function(err) {return(error_value)}, quawak(f = Pnonexc, para = pelwak(lmoms))), # wakeby
-                     Weibull = tryCatch(error = function(err) {return(error_value)}, quawei(f = Pnonexc, para = pelwei(lmoms))), # weibull
+                     Exponential = tryCatch(error = function(err) {return(error_value)}, 
+                                            quaexp(f = Pnonexc, para = pelexp(lmoms))), # exponential
+                     
+                     Gamma = tryCatch(error = function(err) {return(error_value)}, 
+                                      quagam(f = Pnonexc, para = pelgam(lmoms))), # gamma
+                     
+                     GEV = tryCatch(error = function(err) {return(error_value)}, 
+                                    quagev(f = Pnonexc, para = pelgev(lmoms))), # generalized extreme-value
+                     
+                     `Gen. Logistic` = tryCatch(error = function(err) {return(error_value)}, 
+                                                quaglo(f = Pnonexc, para = pelglo(lmoms))), # generalized logistic
+                     
+                     `Gen. Normal` = tryCatch(error = function(err) {return(error_value)}, 
+                                              quagno(f = Pnonexc, para = pelgno(lmoms))), # generalized normal
+                     
+                     `Gen. Pareto` = tryCatch(error = function(err) {return(error_value)}, 
+                                              quagpa(f = Pnonexc, para = pelgpa(lmoms))), # generalized pareto
+                     
+                     Gumbel = tryCatch(error = function(err) {return(error_value)}, 
+                                       quagum(f = Pnonexc, para = pelgum(lmoms))), # gumbel (extreme value type I)
+                     
+                     Kappa = tryCatch(error = function(err) {return(error_value)}, 
+                                      quakap(f = Pnonexc, para = pelkap(lmoms))), # kappa
+                     
+                     Normal = tryCatch(error = function(err) {return(error_value)}, 
+                                       quanor(f = Pnonexc, para = pelnor(lmoms))), # normal
+                     
+                     `Pearson III` = tryCatch(error = function(err) {return(error_value)}, 
+                                              quape3(f = Pnonexc, para = pelpe3(lmoms))), # pearson type III
+                     
+                     Wakeby = tryCatch(error = function(err) {return(error_value)}, 
+                                       quawak(f = Pnonexc, para = pelwak(lmoms))), # wakeby
+                     
+                     Weibull = tryCatch(error = function(err) {return(error_value)}, 
+                                        quawei(f = Pnonexc, para = pelwei(lmoms))), # weibull
                      
                      # Logged distribution from the package
                      `Log-Normal` = tryCatch(error = function(err) {return(error_value)}, qualn3(f = Pnonexc, para = pelln3(lmoms))), # lognormal
