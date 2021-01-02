@@ -513,7 +513,7 @@ shinyServer(function(input, output, session) {
   # Analytical frequency distribution figure
   output$daily_dist_fig <- renderPlotly({
 
-    desired_columns <- Dist_Key[match(input$daily_selector_dist, Dist_Options)]
+    desired_columns <- Dist_Options[match(input$daily_selector_dist, Dist_Options)]
     
     ffa_results <- lmom_Q(Qp = empirical_daily()$`Peak Discharge (cms)`, evaluation = "Plot") %>%
       select(-Pnonexc) %>%
@@ -676,7 +676,7 @@ shinyServer(function(input, output, session) {
            "!!! Insufficient Amount of Sample Data !!!"))
     
 
-    desired_columns <- Dist_Key[match(input$inst_selector_dist, Dist_Options)]
+    desired_columns <- Dist_Options[match(input$inst_selector_dist, Dist_Options)]
     
     if (length(input$inst_selector_Tr) < 1) (
       ffa_results <- lmom_Q(Qp = empirical_inst()$`Inst. Peak Discharge (cms)`) %>%
