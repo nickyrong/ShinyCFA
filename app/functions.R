@@ -2,8 +2,8 @@
 # ------------ HYDAT database loading ------------
 
 # Determine Hydat database location
-if(file.exists("./database/Hydat.sqlite3")) {
-  Hydat_Location <- "./database/Hydat.sqlite3"
+if(file.exists("../../database/Hydat.sqlite3")) {
+  Hydat_Location <- "../../database/Hydat.sqlite3"
 } else {
   Hydat_Location <- tidyhydat::hy_default_db()
 }
