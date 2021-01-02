@@ -15,6 +15,7 @@ library(shinyalert) # for pop-up message in the data removal tab
 library(shinybusy) # busy indicator for rendering plots/tables
 library(FlowScreen) # needed for trend test
 library(pastecs) # quick descriptive stats stat.desc()
+library(httr) #http_status() to check HYDAT version
 
 # -------------- Custom Scripts ------------------
 
