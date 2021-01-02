@@ -111,8 +111,6 @@ shinyServer(function(input, output, session) {
   
   output$README <- renderUI({
     
-      output$README <- renderUI({
-    
     # When run locally, README is in parent folder (for github/gitlab)
     if(file.exists("../README.md")) {
         includeMarkdown("../README.md")
@@ -122,8 +120,7 @@ shinyServer(function(input, output, session) {
     }
 
   })
-    
-  })
+
   
   # -3- Map Tab -----------------------------------------------
   output$MapPlot <- renderLeaflet({
