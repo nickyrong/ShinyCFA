@@ -111,7 +111,17 @@ shinyServer(function(input, output, session) {
   
   output$README <- renderUI({
     
-    includeMarkdown("../README.md")
+      output$README <- renderUI({
+    
+    # When run locally, README is in parent folder (for github/gitlab)
+    if(file.exists("../README.md")) {
+        includeMarkdown("../README.md")
+    } else {
+        # when deployed, README is copied to the same deployment folder
+        includeMarkdown("./README.md")
+    }
+
+  })
     
   })
   
