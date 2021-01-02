@@ -541,7 +541,7 @@ shinyServer(function(input, output, session) {
         scale_x_continuous(name = "Return Periods (Year)", 
                            breaks =-log(-log(1-1/c(2,5,10,20,50,100,200,500,1000))), 
                            labels = c(2,5,10,20,50,100,200,500,1000)) +
-        scale_y_continuous(name = "Intantaneous Peak Discharge (m<sup>3</sup>/s)", limits=c(0, NA)) + 
+        scale_y_continuous(name = "Daily Peak Discharge (m<sup>3</sup>/s)", limits=c(0, NA)) + 
         
         ggtitle("L-moments Fitted Frequency Distributions") 
       
@@ -761,7 +761,7 @@ shinyServer(function(input, output, session) {
         
         scale_x_continuous(name = "Return Periods (Year)", breaks =-log(-log(1-1/c(2,5,10,20,50,100,200,500,1000))), 
                            labels = c(2,5,10,20,50,100,200,500,1000)) +
-        scale_y_continuous(name = "Peak Discharge (m<sup>3</sup>/s)", limits=c(0, NA)) + 
+        scale_y_continuous(name = "Instantaneous Peak Discharge (m<sup>3</sup>/s)", limits=c(0, NA)) + 
         
         ggtitle("L-moments Fitted Frequency Distributions") 
       
