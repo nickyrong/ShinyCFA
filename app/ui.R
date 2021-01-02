@@ -16,7 +16,8 @@ linebreaks <- function(n){HTML(strrep(br(), n))}
 shinyUI(fluidPage(
   
   theme = shinytheme("yeti"),
-  
+  tags$head(HTML("<title>Hydrometric Data Tool for WSC HYDAT</title>")),
+
   # Change font color of error message to red
   tags$head(
     tags$style(HTML("
