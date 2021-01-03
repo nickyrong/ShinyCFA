@@ -17,7 +17,7 @@ gif <- paste0("https://media1.tenor.com/images",
               "/cb27704982766b4f02691ea975d9a259/tenor.gif?itemid=11365139")
 
 loading_screen <- tagList(
-  h3("Give me a sec......", style = "color:gray;"),
+  h3("Give me a sec", style = "color:gray;"),
   img(src = gif, height = "200px")
 )
 #--------------------------

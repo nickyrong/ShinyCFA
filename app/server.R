@@ -767,9 +767,5 @@ shinyServer(function(input, output, session) {
     if (length(desired_columns) > 0) (ggplotly(ffa_plot, height = 800, width = 1000))
   })
   
-  # End the app loading spinner----
-  Sys.sleep(3) # not needed...just want ppl to have enough time to look at the gif...
   waiter_hide()
-  #--------------------------------
-  
 }) # End of ShinyServer(){}
