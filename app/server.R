@@ -781,7 +781,7 @@ shinyServer(function(input, output, session) {
   })
   
   # End the app loading spinner----
-  Sys.sleep(3)
+  Sys.sleep(2)
   waiter_hide()
 
   
