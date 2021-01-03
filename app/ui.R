@@ -4,15 +4,21 @@ library(leaflet)
 library(dygraphs)
 library(plotly)
 library(renv)
-library(shinycssloaders) # withSpinner() indicate calculation/rendering
 library(shinythemes) 
+library(waiter) #loading screen/spinner
 
 
 options(shiny.sanitize.errors = TRUE)
 linebreaks <- function(n){HTML(strrep(br(), n))}
 
+
+  
 # Define UI
 shinyUI(fluidPage(
+  
+  use_waiter(),
+  waiter_show_on_load(html = spin_2(), color = "black"), # place at the top before content
+  
   
   theme = shinytheme("yeti"),
   tags$head(HTML("<title>Hydrometric Data Tool for WSC HYDAT</title>")),
@@ -67,9 +73,7 @@ shinyUI(fluidPage(
         
         tabPanel("Stations Map",
                  br(),
-                 shinycssloaders::withSpinner( 
-                   leafletOutput("MapPlot", height = 800)
-                 ),#End of busy indicator
+                 leafletOutput("MapPlot", height = 800),
                  "Zoom into map to see station locations",
                  br(),
                  "Click on a location to see Station ID, Station Name, and Status: active/discontinued"
@@ -111,9 +115,7 @@ shinyUI(fluidPage(
                             tags$style(type='text/css', "#downloadSummary {margin-top: 60px;}"),
                             
                             br(),
-                            shinycssloaders::withSpinner(
-                              DT::dataTableOutput("table")
-                            )
+                            DT::dataTableOutput("table")
                             
                    ), # End of Data Summary Table sub-tab
                    
@@ -123,9 +125,7 @@ shinyUI(fluidPage(
                             "This is an interactive graph: drag to zoom in and double click to zoom out",
                             br(),
                             h3("Daily Average Discharge Data"),
-                            shinycssloaders::withSpinner(
-                              dygraphOutput(outputId = "tsgraph", height = "600px")
-                            ),
+                            dygraphOutput(outputId = "tsgraph", height = "600px"),
                             br()
                             
                    ), # End of Time Series sub-tab

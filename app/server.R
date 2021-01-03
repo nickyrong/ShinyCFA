@@ -11,10 +11,9 @@ library(lmom) # frequency distribution fitting
 library(plotly) # interactive plots
 library(rlang) # distribution error handling
 library(renv) # package version control
-library(shinybusy) # busy indicator for rendering plots/tables
 library(FlowScreen) # hydrograph and trend test functionality
 library(pastecs) # quick descriptive stats stat.desc()
-library(httr) #http_status() to check HYDAT version
+library(httr) # require to check HYDAT newest version
 
 # -------------- Custom Scripts ------------------
 
@@ -27,11 +26,15 @@ source("./FlowScreen_funs_fixed.R")
 # Define server logic
 shinyServer(function(input, output, session) {
   
+  # Here set up any elements that require spinner
+  spin_tsgraph <- Waiter$new("tsgraph")
+  spin_table <- Waiter$new("table")
+  
   # -1- SideBar UI --------------------------------------------
   
   # HYDAT version query
   output$HYDAT_version <- renderText({
-    
+
     db_ver_date <- tidyhydat::hy_version(hydat_path = Hydat_Location) %>% 
       "[["(1,2) %>% base::as.Date() #*
     
@@ -124,6 +127,7 @@ shinyServer(function(input, output, session) {
   
   # -3- Map Tab -----------------------------------------------
   output$MapPlot <- renderLeaflet({
+    
     map_data %>%
       
       # Some locations are wrong (impossible values)
@@ -138,6 +142,8 @@ shinyServer(function(input, output, session) {
       setView(lng = -122.7497, lat = 53.9171, zoom = 5) %>%
       
       addMarkers(~LONGITUDE, ~LATITUDE, popup = ~text, clusterOptions = markerClusterOptions())
+    
+
   })
   
   # -4- Data Summary Tab ---------------------------------------
@@ -157,6 +163,8 @@ shinyServer(function(input, output, session) {
   })
   
   output$table <- DT::renderDataTable({
+    
+    spin_table$show() #show spinner
     
     summarized()%>% 
       
@@ -200,6 +208,8 @@ shinyServer(function(input, output, session) {
 
   ### Plot an interactive graph
   output$tsgraph <- renderDygraph({
+    
+    spin_tsgraph$show() # show spinner
     
     # Spread the flow data by the flag
     TS <- Qdaily() %>%
@@ -770,5 +780,9 @@ shinyServer(function(input, output, session) {
     if (length(desired_columns) > 0) (ggplotly(ffa_plot, height = 800, width = 1000))
   })
   
+  # End the app loading spinner----
+  Sys.sleep(3)
+  waiter_hide()
+
   
 }) # End of ShinyServer(){}
