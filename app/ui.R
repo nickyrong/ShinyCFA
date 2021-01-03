@@ -11,22 +11,13 @@ library(waiter) #loading screen/spinner
 options(shiny.sanitize.errors = TRUE)
 linebreaks <- function(n){HTML(strrep(br(), n))}
 
-# Spinner Stuff------------
-# a notorious gif
-gif <- paste0("https://media1.tenor.com/images",
-              "/cb27704982766b4f02691ea975d9a259/tenor.gif?itemid=11365139")
 
-loading_screen <- tagList(
-  h3("Give me a sec......", style = "color:gray;"),
-  img(src = gif, height = "200px")
-)
-#--------------------------
   
 # Define UI
 shinyUI(fluidPage(
   
   use_waiter(),
-  waiter_show_on_load(html = loading_screen), # place at the top before content
+  waiter_show_on_load(html = spin_2(), color = "black"), # place at the top before content
   
   
   theme = shinytheme("yeti"),

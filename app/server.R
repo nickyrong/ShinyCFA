@@ -13,7 +13,7 @@ library(rlang) # distribution error handling
 library(renv) # package version control
 library(FlowScreen) # hydrograph and trend test functionality
 library(pastecs) # quick descriptive stats stat.desc()
-
+library(httr) # require to check HYDAT newest version
 
 # -------------- Custom Scripts ------------------
 
@@ -781,8 +781,7 @@ shinyServer(function(input, output, session) {
   })
   
   # End the app loading spinner----
-  Sys.sleep(3) # not needed...just want ppl to have enough time to look at the gif...
   waiter_hide()
-  #--------------------------------
+
   
 }) # End of ShinyServer(){}
