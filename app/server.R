@@ -34,18 +34,31 @@ shinyServer(function(input, output, session) {
   
   # HYDAT version query
   output$HYDAT_version <- renderText({
-    
+
     db_ver_date <- tidyhydat::hy_version(hydat_path = Hydat_Location) %>% 
-      "[["(1,2) %>% base::as.Date() 
+      "[["(1,2) %>% base::as.Date() #*
     
-    how_old <- base::difftime(Sys.Date(),db_ver_date, units = "days")
+    validate(
+      need(
+        http_status(GET('https://collaboration.cmc.ec.gc.ca/cmc/hydrometrics/www/'))$reason == "OK",
+        paste0("HYDAT Databse Ver.: ", db_ver_date, "\n",
+               "(Ver verification failed: cannot connect to WSC)")
+        
+      )
+    )
     
-    if (how_old>100) {
+    HYDAT_page <- readLines('https://collaboration.cmc.ec.gc.ca/cmc/hydrometrics/www/')
+    sqlite3_line <- HYDAT_page[grep(pattern = "Hydat_sqlite3", x = HYDAT_page)]
+    
+    most_updated_ver <- gsub('^.*Hydat_sqlite3_\\s*|\\s*.zip.*$', '', sqlite3_line) %>% 
+      base::as.Date(format = "%Y%m%d")
+    
+    if (db_ver_date < most_updated_ver) {
       
       paste0("HYDAT Databse Ver.: ", db_ver_date, "\n",
              "<p style='color:red'> (Outdated - Contact App Maintainers) </p>")
       
-    } else if(how_old<=90){
+    } else if(db_ver_date == most_updated_ver){
       
       paste0("HYDAT Databse Ver.: ", db_ver_date, "\n",
              "<p style='color:green'> (Up-to-date) </p>")
