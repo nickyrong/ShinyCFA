@@ -4,30 +4,15 @@ library(leaflet)
 library(dygraphs)
 library(plotly)
 library(renv)
+library(shinycssloaders) # withSpinner() indicate calculation/rendering
 library(shinythemes) 
-library(waiter) #loading screen/spinner
 
 
 options(shiny.sanitize.errors = TRUE)
 linebreaks <- function(n){HTML(strrep(br(), n))}
 
-# Spinner Stuff------------
-# a notorious gif
-gif <- paste0("https://media1.tenor.com/images",
-              "/cb27704982766b4f02691ea975d9a259/tenor.gif?itemid=11365139")
-
-loading_screen <- tagList(
-  h3("Give me a sec", style = "color:gray;"),
-  img(src = gif, height = "200px")
-)
-#--------------------------
-  
 # Define UI
 shinyUI(fluidPage(
-  
-  use_waiter(),
-  waiter_show_on_load(html = loading_screen), # place at the top before content
-  
   
   theme = shinytheme("yeti"),
   tags$head(HTML("<title>Hydrometric Data Tool for WSC HYDAT</title>")),
@@ -82,7 +67,9 @@ shinyUI(fluidPage(
         
         tabPanel("Stations Map",
                  br(),
-                 leafletOutput("MapPlot", height = 800),
+                 shinycssloaders::withSpinner( 
+                   leafletOutput("MapPlot", height = 800)
+                 ),#End of busy indicator
                  "Zoom into map to see station locations",
                  br(),
                  "Click on a location to see Station ID, Station Name, and Status: active/discontinued"
@@ -124,7 +111,9 @@ shinyUI(fluidPage(
                             tags$style(type='text/css', "#downloadSummary {margin-top: 60px;}"),
                             
                             br(),
-                            DT::dataTableOutput("table")
+                            shinycssloaders::withSpinner(
+                              DT::dataTableOutput("table")
+                            )
                             
                    ), # End of Data Summary Table sub-tab
                    
@@ -134,7 +123,9 @@ shinyUI(fluidPage(
                             "This is an interactive graph: drag to zoom in and double click to zoom out",
                             br(),
                             h3("Daily Average Discharge Data"),
-                            dygraphOutput(outputId = "tsgraph", height = "600px"),
+                            shinycssloaders::withSpinner(
+                              dygraphOutput(outputId = "tsgraph", height = "600px")
+                            ),
                             br()
                             
                    ), # End of Time Series sub-tab
