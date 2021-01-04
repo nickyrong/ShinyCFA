@@ -17,7 +17,7 @@ linebreaks <- function(n){HTML(strrep(br(), n))}
 shinyUI(fluidPage(
   
   use_waiter(),
-  waiter_show_on_load(html = spin_2(), color = "black"), # place at the top before content
+  waiter_show_on_load(html = spin_fading_circles(), color = "black"), # place at the top before content
   
   
   theme = shinytheme("yeti"),
@@ -50,7 +50,8 @@ shinyUI(fluidPage(
 
       # https://shiny.rstudio.com/articles/selectize.html
       selectizeInput("stn_id_input", label = h3("WSC Station ID"),
-                     choices = c("Loading..."),
+                     choices = NULL,
+                     selected = "Loading...",
                      multiple= FALSE,
                      options = list(maxOptions = 5)),
       

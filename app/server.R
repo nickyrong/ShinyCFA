@@ -27,8 +27,9 @@ source("./FlowScreen_funs_fixed.R")
 shinyServer(function(input, output, session) {
   
   # Here set up any elements that require spinner
-  spin_tsgraph <- Waiter$new("tsgraph")
-  spin_table <- Waiter$new("table")
+  spin_tsgraph <- Waiter$new("tsgraph", html = spin_fading_circles(), color = "black")
+  spin_table <- Waiter$new("table", html = spin_fading_circles(), color = "black")
+  
   
   # -1- SideBar UI --------------------------------------------
   
