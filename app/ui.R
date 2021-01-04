@@ -50,7 +50,7 @@ shinyUI(fluidPage(
 
       # https://shiny.rstudio.com/articles/selectize.html
       selectizeInput("stn_id_input", label = h3("WSC Station ID"),
-                     choices = NULL,
+                     choices = c("Loading..."),
                      multiple= FALSE,
                      options = list(maxOptions = 5)),
       
