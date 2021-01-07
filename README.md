@@ -10,11 +10,9 @@ ShinyCFA is currently available at: https://app.waterexplorer.net/shinyCFA. Plea
 This app allows the user to enter a Water Survey of Canada (WSC) station ID and access streamflow data from the [Hydat Database](https://www.canada.ca/en/environment-climate-change/services/water-overview/quantity/monitoring/survey/data-products-services/national-archive-hydat.html). The data can be summarized in tabular or graphical formats and flood frequency analysis (FFA) can also be performed using a variety of distributions.
 
 The functionality to extract data from the Hydat Database in this app is provided by the [tidyhydat package](https://github.com/ropensci/tidyhydat). 
-<br/>
+
 <img src="https://github.com/ropensci/tidyhydat/raw/master/man/figures/tidyhydat.png" width="6%" />
 <br/>
-<br/>
-
 
 ## App Functionality:
 Currently the app allows the user to:
@@ -25,7 +23,7 @@ Currently the app allows the user to:
 - View a hydrometric station hydrological regime
 - Run a Flood Frequency Analysis on the annual daily or instantaneous maximum streamflow series using various distributions 
 
-<br/>
+
 
 ## Frequency Analysis Methods:
 The frequency distribution(s) are fitted using L-moments method from R package [lmom](https://cran.r-project.org/web/packages/lmom/index.html) by J. R. M. Hosking. L-moments of the sample data are calculated and distribution parameters are then estimated from the calculated L-moments.
