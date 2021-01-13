@@ -267,7 +267,7 @@ lmom_Q <- function(Qp, empirical.Tr = NA, evaluation = FALSE) {
 
 
 # calculate empirical frequency
-empirical_ffa <- function(flow_df, complete_years, selected_months){
+empirical_ffa <- function(flow_df, complete_years, selected_months, wy_month = NULL){
   
   flow_df %>% 
     
@@ -276,7 +276,7 @@ empirical_ffa <- function(flow_df, complete_years, selected_months){
     filter(lubridate::year(Date) %in% complete_years,
            lubridate::month(Date) %in% selected_months) %>%
     drop_na(Flow) %>%
-    group_by(Year = lubridate::year(Date)) %>%
+    group_by(Year = hydro_yr(Date, hyrstart = wy_month)) %>%
     filter(Flow == max(Flow)) %>%
     rename(AMS = Flow) %>%
     ungroup() %>%
