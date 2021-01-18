@@ -176,7 +176,6 @@ shinyUI(fluidPage(
                    #---- Sub tab: Qdaily
                    tabPanel("Daily Q",
                             br(),
-                            h4('Frequency analysis is currently only performed using calendar year'),
                             h2('1. Settings'),
                             fluidRow(
                               column(4,
@@ -238,7 +237,7 @@ shinyUI(fluidPage(
                    #---- Sub tab: Frequency Distribution
                    tabPanel("Instantaneous Q",
                             br(),
-                            h4('Frequency analysis is currently only performed using calendar year'),
+                            code('Annual Instantaneous Maxs were pre-determined by WSC using calendar year, therefore Water Year setting is not in effect.'),
                             h2('1. Settings'),
                             fluidRow(
                               column(4,
