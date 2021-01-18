@@ -327,7 +327,7 @@ shinyServer(function(input, output, session) {
   Qdaily_years <- reactive({
 
     complete_years <- Qdaily() %>%
-      mutate(Year = lubridate::year(Date)) %>%
+      mutate(Year = hydro_yr(Date, as.numeric(input$wy_start))) %>%
       drop_na(Flow) %>%
       group_by(Year) %>%
       count(Year) %>%
@@ -352,8 +352,8 @@ shinyServer(function(input, output, session) {
       need(input$stn_id_input, "Invalid Station ID"))
     
     validate(
-      need((Qdaily_years()[!(Qdaily_years() %in% input$remove_year_Qdaily)]) > 2,
-           "!!! Insufficient Amount of Complete Year !!!"))
+      need(length(Qdaily_years()[!(Qdaily_years() %in% input$remove_year_Qdaily)]) > 2,
+           "[Insufficient Amount of Complete Year]"))
     
     Qdaily_years()[!(Qdaily_years() %in% input$remove_year_Qdaily)]
     
@@ -383,8 +383,8 @@ shinyServer(function(input, output, session) {
   empirical_daily <- reactive({
     
     validate(
-      need((Qdaily_years()[!(Qdaily_years() %in% input$remove_year_Qdaily)]) > 2,
-           "!!! Insufficient Amount of Complete Year !!!"))
+      need(length(Qdaily_years()[!(Qdaily_years() %in% input$remove_year_Qdaily)]) > 2,
+           "[Insufficient Amount of Complete Year]"))
     
     validate(
       need(length(input$months_Qdaily)>0, "Select at least 1 month")
@@ -392,7 +392,8 @@ shinyServer(function(input, output, session) {
     
     empirical_ffa(flow_df = Qdaily(), 
                   complete_years = complete_years_Qdaily(), 
-                  selected_months = selected_months_num()) %>%
+                  selected_months = selected_months_num(),
+                  wy_month = as.numeric(input$wy_start)) %>%
      
       rename(`Peak Discharge (cms)` = AMS)
     
@@ -416,7 +417,8 @@ shinyServer(function(input, output, session) {
                                                     `Return Period` = `Return Period`)) +
       geom_point() + theme_bw() +
       scale_y_continuous(name = "Annual Max Peak Discharge (m<sup>3</sup>/s)", limits=c(0, NA)) +
-      scale_x_continuous(name = "Year", limits=c(NA, NA)) +
+      {if(as.numeric(input$wy_start)==1) scale_x_continuous(name = "Year", limits=c(NA, NA))} +
+      {if(as.numeric(input$wy_start)!=1) scale_x_continuous(name = "Water Year", limits=c(NA, NA))} +
       ggtitle(paste0(input$stn_id_input, " Daily Flow"))
     
     ggplotly(daily_ams_plot)
@@ -428,6 +430,10 @@ shinyServer(function(input, output, session) {
     
     formated_df <- empirical_daily() %>%
       select(ID, Year, Date, `Peak Discharge (cms)`, Rank, `Return Period`, SYM) 
+    
+    if (as.numeric(input$wy_start) != 1) {
+      formated_df <- formated_df %>% rename(`WaterYear` = Year)
+    }
     
     formated_df %>% DT::datatable(
       # Options for data table formatting
@@ -459,8 +465,8 @@ shinyServer(function(input, output, session) {
   analytical_daily <- reactive({
     
     validate(
-      need((Qdaily_years()[!(Qdaily_years() %in% input$remove_year_Qdaily)]) > 2,
-           "!!! Insufficient Amount of Complete Year !!!"))
+      need(length(Qdaily_years()[!(Qdaily_years() %in% input$remove_year_Qdaily)]) > 2,
+           "[Insufficient Amount of Complete Year]"))
     
     validate(
       need(length(input$months_Qdaily)>0, "Select at least 1 month")
@@ -590,8 +596,8 @@ shinyServer(function(input, output, session) {
       need(input$stn_id_input, "Invalid Station ID"))
     
     validate(
-      need(Qinst_years()[!(Qinst_years() %in% input$remove_year_Qinst)] > 2,
-           "!!! Insufficient Amount of Complete Year !!!"))
+      need(length(Qinst_years()[!(Qinst_years() %in% input$remove_year_Qinst)]) > 2,
+           "[Insufficient Amount of Complete Year]"))
     
     Qinst_years()[!(Qinst_years() %in% input$remove_year_Qinst)]
     
@@ -610,13 +616,15 @@ shinyServer(function(input, output, session) {
   empirical_inst <- reactive({
     
     validate(
-      need(Qinst_years()[!(Qinst_years() %in% input$remove_year_Qinst)] > 2,
-           "!!! Insufficient Amount of Sample Data !!!"))
+      need(length(Qinst_years()[!(Qinst_years() %in% input$remove_year_Qinst)]) > 2,
+           "[Insufficient Amount of Sample Data]"))
     
 
     empirical_ffa(flow_df = Qinst(), 
                   complete_years = selected_years_Qinst(), 
-                  selected_months = seq(1:12)) %>%
+                  selected_months = seq(1:12),
+                  #do not use water year in Qinst!!
+                  wy_month = 1) %>%
       
       rename(`Inst. Peak Discharge (cms)` = AMS)
     
@@ -683,8 +691,8 @@ shinyServer(function(input, output, session) {
   analytical_inst <- reactive({
     
     validate(
-      need(Qinst_years()[!(Qinst_years() %in% input$remove_year_Qinst)] > 2,
-           "!!! Insufficient Amount of Sample Data !!!"))
+      need(length(Qinst_years()[!(Qinst_years() %in% input$remove_year_Qinst)]) > 2,
+           "[Insufficient Amount of Sample Data]"))
     
 
     desired_columns <- Dist_Options[match(input$inst_selector_dist, Dist_Options)]
