@@ -11,7 +11,7 @@ This app allows the user to enter a Water Survey of Canada (WSC) station ID and 
 
 The functionality to extract data from the Hydat Database in this app is provided by the [tidyhydat package](https://github.com/ropensci/tidyhydat). 
 
-<img src="https://github.com/ropensci/tidyhydat/blob/main/man/figures/tidyhydat.png" width="6%" />
+<img src="https://github.com/ropensci/tidyhydat/raw/main/man/figures/tidyhydat.png" width="6%" />
 <br/>
 
 ## App Functionality:
