@@ -5,7 +5,7 @@
 <br/>
 
 ## Overview
-ShinyCFA is currently available at: https://app.waterexplorer.net/shinyCFA. Please note that it is hosted using free tier services available through AWS.
+ShinyCFA is currently available at: https://nickrongkp.shinyapps.io/ShinyCFA/ Please note that it is hosted with low limit data plan and be conservative with your usage (i.e. close the tab/browser when not using the app), thank you.
 
 This app allows the user to enter a Water Survey of Canada (WSC) station ID and access streamflow data from the [Hydat Database](https://www.canada.ca/en/environment-climate-change/services/water-overview/quantity/monitoring/survey/data-products-services/national-archive-hydat.html). The data can be summarized in tabular or graphical formats and flood frequency analysis (FFA) can also be performed using a variety of distributions.
 
@@ -36,7 +36,7 @@ Return periods of annual maximum discharge are calculated using the Weibull form
 <br/>
 
 ## License
-Copyright © 2021 [Nick Rong](https://github.com/nickyrong) & [Nate Smith](https://github.com/WraySmith)
+Copyright © 2022 [Nick Rong](https://github.com/nickyrong) & [Nate Smith](https://github.com/WraySmith)
 
 Released under the [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
