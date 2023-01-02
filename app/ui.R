@@ -21,6 +21,7 @@ shinyUI(fluidPage(
   
   
   theme = shinytheme("yeti"),
+  tags$head(includeScript("./database/plausible.js")),
   tags$head(HTML("<title>Hydrometric Data Tool for WSC HYDAT</title>")),
 
   # Change font color of error message to red
