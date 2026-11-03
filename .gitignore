@@ -3,6 +3,21 @@
 .RData
 .Ruserdata
 
+# HYDAT database + WSC basin polygon GeoPackages (~4 GB). Downloaded, not built;
+# deployed in the Connect Cloud bundle but not stored in git.
 app/database
+
+# Cached station metadata (rebuilt from HYDAT when stale)
+app/data/map_data.rds
+
+# Raw HYSETS source files (reproducible via build_roi_descriptors.R, which downloads
+# them from OSF). The small derived hysets_descriptors.rds IS committed.
+app/regional_analysis/roi/HYSETS_watershed_properties.txt
+app/regional_analysis/roi/*.nc
+app/regional_analysis/roi/*.zip
+
+# Local deployment records and handoff notes
+app/rsconnect/
+ShinyCFA_Connect_Cloud_handoff.md
+
 app/README.md
-app/rsconnect/shinyapps.io/nickrongkp/ShinyCFA.dcf
