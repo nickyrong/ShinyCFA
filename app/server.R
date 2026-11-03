@@ -48,14 +48,13 @@ shinyServer(function(input, output, session) {
     )
     validate(need(!is.null(db_ver_date), "HYDAT version could not be read."))
 
-    # The newest-release check is only informative: if WSC can't be reached, still
-    # show the installed version rather than an error.
+    # The newest-release check is only informative: if WSC can't be reached, just
+    # show the installed version, with no status note.
     HYDAT_page <- wsc_collab_page()
 
     if (inherits(HYDAT_page, "error")) {
 
-      paste0("HYDAT Database Ver.: ", db_ver_date, "\n",
-             "<p style='color:orange'> (Ver verification failed: cannot connect to WSC) </p>")
+      paste0("HYDAT Database Ver.: ", db_ver_date)
 
     } else {
 
